@@ -562,56 +562,7 @@ export default function MeetingDetail() {
         </div>
       </section>
 
-      {/* Generated Files Editor (Removed from here, will be in the new route) */}
-{/*       {showEditor && (
-  <section style={{ background: "#f9f9f9", padding: "24px", borderRadius: "14px", marginBottom: "32px" }}>
-    <h3 style={{ marginBottom: "18px" }}>Generated Files</h3>
-    {generatedFiles.map((file, idx) => (
-      <div key={file.name} style={{ marginBottom: "24px" }}>
-        <label style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}>{file.name}</label>
-        <textarea
-          value={editingFiles[idx]}
-          onChange={e => {
-            const newFiles = [...editingFiles];
-            newFiles[idx] = e.target.value;
-            setEditingFiles(newFiles);
-          }}
-          rows={10}
-          style={{ width: "100%", fontFamily: "monospace", fontSize: "1rem", borderRadius: "8px", padding: "10px" }}
-        />
-      </div>
-    ))}
-    <button
-      onClick={async () => {
-        setUpdateFilesLoading(true);
-        setFilesError(null);
-        try {
-          const res = await fetch(`${API}/api/external/save-files`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              meetingId: dbId,
-              files: generatedFiles.map((f, i) => ({ name: f.name, content: editingFiles[i] }))
-            })
-          });
-          if (!res.ok) throw new Error(await res.text());
-          alert("Files updated!");
-          setShowEditor(false);
-        } catch (err) {
-          setFilesError(err.message || "Failed to save files.");
-        } finally {
-          setUpdateFilesLoading(false);
-        }
-      }}
-      disabled={updateFilesLoading}
-      className="btn btn-success"
-      style={{ marginTop: "12px" }}
-    >
-      {updateFilesLoading ? "Saving..." : "Update Files"}
-    </button>
-    {filesError && <div style={{ color: "red", marginTop: "12px" }}>{filesError}</div>}
-  </section>
-)} */}
+      
 
    
 

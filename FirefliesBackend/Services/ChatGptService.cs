@@ -12,6 +12,7 @@ namespace FirefliesBackend.Services
 {
     public static class ChatGptService
     {
+        // Generates files based on a meeting summary using OpenAI's GPT model
         public static async Task<List<FileResult>> GenerateFilesFromSummary(HttpClient client, string summary, string apiKey)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
@@ -105,6 +106,7 @@ Meeting summary:
             return allFiles;
         }
 
+        // Parses the assistant's text response to extract file results
         private static List<FileResult> ParseJsonFiles(string assistantText)
         {
             var cleaned = StripCodeFences(assistantText);
@@ -160,6 +162,7 @@ Meeting summary:
             };
         }
 
+        // Converts a list of FileResultDto to a FileResult with the specified filename
         private static FileResult ToFileResult(List<FileResultDto> items, string filename)
         {
             var match = items.Find(x => string.Equals(x.name?.Trim(), filename, StringComparison.OrdinalIgnoreCase));
@@ -170,6 +173,7 @@ Meeting summary:
             };
         }
 
+        // Helper methods to clean up the response text
         private static string StripCodeFences(string s)
         {
             if (string.IsNullOrEmpty(s)) return s;
@@ -178,6 +182,8 @@ Meeting summary:
             return s.Trim();
         }
 
+        // Extracts a valid JSON substring from the response text
+        // This handles both array and object formats
         private static string ExtractJsonSubstring(string s)
         {
             if (string.IsNullOrWhiteSpace(s)) return null;
@@ -186,6 +192,9 @@ Meeting summary:
             return FindBalancedJson(s, '{', '}');
         }
 
+        
+        // Finds a balanced JSON substring in the input string
+        // This is used to extract the JSON array or object from the response text
         private static string FindBalancedJson(string s, char openChar, char closeChar)
         {
             int start = s.IndexOf(openChar);
@@ -211,6 +220,8 @@ Meeting summary:
             return null;
         }
 
+        // DTO for deserializing the file results
+        // This is used to map the JSON response to a C# object
         private class FileResultDto
         {
             public string name { get; set; } = "";

@@ -10,6 +10,9 @@ namespace FirefliesBackend.Services
 {
     public class FirefliesOptions { public string ApiKey { get; set; } }
 
+    // Client for interacting with the Fireflies API
+    // This client handles GraphQL queries to fetch meeting data and summaries
+    // It uses an API key for authentication and sends requests to the Fireflies GraphQL endpoint
     public class FirefliesClient : IFirefliesClient
     {
         private readonly HttpClient _http;
@@ -23,6 +26,8 @@ namespace FirefliesBackend.Services
                 throw new ArgumentException("Fireflies:ApiKey is not configured.");
         }
 
+        // Executes a GraphQL query against the Fireflies API
+        // This method sends a POST request with the query and optional variables
         public async Task<JsonDocument> QueryAsync(string graphqlQuery, object variables = null)
         {
             var payload = new { query = graphqlQuery, variables };

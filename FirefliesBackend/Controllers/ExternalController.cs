@@ -17,10 +17,10 @@ namespace FirefliesBackend.Controllers
     [Route("api/external")]
     public class ExternalController : ControllerBase
     {
-        private readonly IFirefliesClient _ff;
-        private readonly AppDbContext _db;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IConfiguration _configuration;
+        private readonly IFirefliesClient _ff; // Fireflies client to interact with the Fireflies API
+        private readonly AppDbContext _db;// Database context to interact with the local database
+        private readonly IHttpClientFactory _httpClientFactory;// Factory to create HTTP clients for external API calls
+        private readonly IConfiguration _configuration;// Configuration to access app settings
 
         public ExternalController(IFirefliesClient ff, AppDbContext db, IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
@@ -30,6 +30,11 @@ namespace FirefliesBackend.Controllers
             _configuration = configuration;
         }
 
+           // Endpoint to get a list of meetings from Fireflies
+        // This will return the latest meetings with their details like id, title, date, duration
+        // It will also return the summary of each meeting
+        // The limit parameter can be used to limit the number of meetings returned
+        // Default limit is 25 meetings
            [HttpGet("meetings")]
         public async Task<IActionResult> GetMeetings(int limit = 25)
         {
@@ -44,6 +49,7 @@ namespace FirefliesBackend.Controllers
         }
 
 
+        // Endpoint to get a meeting by its id
         [HttpGet("meetings/{id}")]
         public async Task<IActionResult> GetMeeting(string id)
         {
@@ -89,7 +95,7 @@ namespace FirefliesBackend.Controllers
         var doc = await _ff.QueryAsync(query, new { id });
         var transcriptEl = doc.RootElement.GetProperty("data").GetProperty("transcript");
 
-//Parse Meeting Date into dateTime
+        //Parse Meeting Date into dateTime
         DateTime? meetingDate = null;
         if (transcriptEl.TryGetProperty("date", out var dateEl))
         {
@@ -160,7 +166,11 @@ namespace FirefliesBackend.Controllers
         return StatusCode(500, new { message = "An unexpected error occurred while processing data from Fireflies.", error = ex.GetType().Name });
     }
 }
-
+        // Endpoint to generate files from a meeting summary
+        // This will call the OpenAI API to generate files based on the meeting summary
+        // It will return the generated files as a list of FileResult objects
+        // The request body should contain a GenerateFilesRequest object with the summary
+        // The response will be a list of FileResult objects containing the file name and content
         [HttpPost("generate-files")]
         public async Task<IActionResult> GenerateFiles([FromBody] GenerateFilesRequest req)
         {
@@ -176,6 +186,8 @@ namespace FirefliesBackend.Controllers
             return Ok(files);
         }
 
+        // Endpoint to save generated files to a meeting
+        // This will save the files generated from the meeting summary
         [HttpPost("save-files")]
         public async Task<IActionResult> SaveFiles([FromBody] SaveFilesRequest req)
         {

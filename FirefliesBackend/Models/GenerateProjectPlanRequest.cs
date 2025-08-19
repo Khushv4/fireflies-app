@@ -1,11 +1,13 @@
 namespace FirefliesBackend.Models
 {
+    // Request to generate a project plan
     public class GenerateProjectPlanRequest
     {
         public int DurationWeeks { get; set; }
         public string AdditionalDetails { get; set; } = string.Empty;
     }
 
+    // Response containing the generated project plan
     public class ProjectPlanResponse
     {
         public int MeetingId { get; set; }

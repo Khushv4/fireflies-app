@@ -10,12 +10,14 @@ using FirefliesBackend.Models;
 
 namespace FirefliesBackend.Services
 {
+    // Service for generating project plans
     public static class ProjectPlanService
     {
         private const int MAX_TOKENS_PER_REQUEST = 16000; // Safe limit for GPT-4o-mini
         private const int CHARS_PER_TOKEN = 4; // Rough estimate
         private const int SMART_TRUNCATION_LIMIT = 50000; // New: Smart truncation threshold
 
+        // Generates a detailed project plan based on functional documents, mockups, and markdown
         public static async Task<string> GenerateProjectPlan(
             HttpClient client, 
             string functionalDoc, 
@@ -123,6 +125,7 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             return TruncateIntelligently(sections, SMART_TRUNCATION_LIMIT);
         }
 
+        // Extracts key content from the provided document based on type
         private static string ExtractKeyContent(string document, DocumentType type)
         {
             if (string.IsNullOrEmpty(document)) return "";
@@ -136,6 +139,7 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             };
         }
 
+        // Extracts key functional requirements from the document
         private static string ExtractFunctionalKeys(string doc)
         {
             // Extract: requirements, features, user stories, acceptance criteria
@@ -157,6 +161,7 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             return extractedContent;
         }
 
+        // Extracts key technical specifications from the document
         private static string ExtractTechnicalKeys(string doc)
         {
             // Extract: tech stack, architecture, APIs, database, frameworks
@@ -178,6 +183,7 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             return extractedContent;
         }
 
+        // Extracts key mockup and UI elements from the document
         private static string ExtractMockupKeys(string doc)
         {
             // Extract: screens, components, user flows, navigation, UI elements
@@ -198,6 +204,7 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             return extractedContent;
         }
 
+        // Extracts content based on multiple regex patterns
         private static string ExtractByPatterns(string text, string[] patterns)
         {
             var matches = new List<string>();
@@ -228,6 +235,7 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             return string.Join("\n", matches.Take(15));
         }
 
+        // Builds the final output string from the optimized sections
         private static string BuildOptimizedOutput(List<DocumentSection> sections, int totalLength)
         {
             var result = new StringBuilder();
@@ -245,6 +253,7 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             return result.ToString();
         }
 
+        // Smart truncation of sections based on priority and content length
         private static string TruncateIntelligently(List<DocumentSection> sections, int maxChars)
         { 
             var result = new StringBuilder();

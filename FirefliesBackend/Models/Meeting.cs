@@ -2,6 +2,7 @@ using System;
 
 namespace FirefliesBackend.Models
 {
+    // Represents a meeting with various details including project plan information
     public class Meeting
     {
         public int Id { get; set; }
