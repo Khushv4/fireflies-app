@@ -30,7 +30,9 @@ export default function Home() {
         const total = meetings.length;
         const saved = meetings.filter(m => m.summary && m.summary.length > 0).length;
         const plans = meetings.filter(m => m.hasProjectPlan).length;
-        const avgDur = total > 0 ? Math.round(meetings.reduce((a, b) => a + (b.DurationSeconds || 0), 0) / total / 60) : 0;
+        const avgDur = total > 0 ? Math.round(meetings.reduce((sum, m) => sum + (m.durationSeconds || 0), 0) / total
+    )
+  : 0;
 
         setStats({ totalMeetings: total, saved, plansGenerated: plans, avgDuration: avgDur });
         setRecentMeetings(meetings.slice(0, 6));
@@ -115,7 +117,7 @@ export default function Home() {
                   <div>
                     <p className="font-semibold text-gray-800">{m.title || "Untitled"}</p>
                     <p className="text-sm text-gray-500">
-                      {new Date(m.meetingDate).toLocaleDateString()} • {Math.round((m.durationSeconds || 0) / 60)} min
+                      {new Date(m.meetingDate).toLocaleDateString()} • {Math.round((m.durationSeconds || 0) )} min
                     </p>
                   </div>
                   <div className="flex gap-2">

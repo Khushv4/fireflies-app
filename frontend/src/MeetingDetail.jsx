@@ -1,39 +1,34 @@
-
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Download, ArrowLeftFromLine, Save, RefreshCw, Check, Settings2 } from 'lucide-react';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import FileSelectionModal from './FileSelectionModal'; // Import the new modal
 
 const API = import.meta.env.VITE_API_BASE_URL || "";
 
-// Helper functions (no changes)
+// ... (keep all your existing helper functions like parseDate, safeJsonParse, useAutosizeTextArea, CustomCheckbox, LoadingSkeleton)
 function parseDate(value) {
   if (!value) return null;
   const n = typeof value === "number" ? value : Number(value) || null;
   return n ? new Date(n) : new Date(value);
 }
 
-// Add this helper function at the top of MeetingDetail.jsx
-
 function safeJsonParse(str) {
   if (typeof str !== 'string') {
-    return str; // Return as is if it's not a string
+    return str;
   }
   try {
     const trimmed = str.trim();
-    // Only parse if it looks like a JSON object or array
     if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
       return JSON.parse(str);
     }
   } catch (e) {
     console.warn("Failed to parse JSON string, returning as is:", str);
-    return str; // If parsing fails, return the original string
+    return str;
   }
-  // If it's not a JSON-like string, return it as is
   return str;
 }
-
 
 function useAutosizeTextArea(textAreaRef, value) {
   useEffect(() => {
@@ -81,33 +76,28 @@ export default function MeetingDetail() {
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [summaryPreferences, setSummaryPreferences] = useState(null);
   const [previewMode, setPreviewMode] = useState(true);
+  
+  // Add state for file selection modal
+  const [showFileSelectionModal, setShowFileSelectionModal] = useState(false);
 
   const textAreaRef = useRef(null);
   useAutosizeTextArea(textAreaRef, summary);
 
-  // ✅ **UPDATED DATA FETCHING useEffect**
-  // In MeetingDetail.jsx
-
+  // ... (keep all your existing useEffect for data fetching)
   useEffect(() => {
     setLoading(true);
     fetch(`${API}/api/external/meetings/${id}`)
     .then(res => {
-        // First, check if the response was successful (status 200-299)
         if (!res.ok) {
-            // If not, read the response body as text and throw an error.
-            // This will be caught by the .catch() block.
             return res.text().then(text => { 
                 try {
-                    // Try to parse it as JSON (for our custom backend errors)
                     const errorJson = JSON.parse(text);
                     throw new Error(errorJson.message || 'An unknown error occurred.');
                 } catch (e) {
-                    // If it's not JSON, just throw the raw text
                     throw new Error(text || 'An unknown server error occurred.');
                 }
             });
         }
-        // If successful, parse the JSON body and continue
         return res.json();
     })
     .then(data => {
@@ -141,11 +131,11 @@ export default function MeetingDetail() {
       }
       
       if (data.userEditedSummary) {
-        setSummaryText(data.userEditedSummary);
+        setSummary(data.userEditedSummary);
       } else {
         let finalSummary = "";
         const summaryData = meetingData.summary;
-        if (summaryData) { // Check if summaryData exists
+        if (summaryData) {
             const tempPrefs = data.summaryPreferencesJson ? JSON.parse(data.summaryPreferencesJson) : { overview: true, action_items: true, keywords: true, bullet_gist: true };
 
             if (tempPrefs.overview && (summaryData.overview || summaryData.short_summary)) {
@@ -179,7 +169,7 @@ export default function MeetingDetail() {
     .finally(() => setLoading(false));
   }, [id]);
 
-
+  // ... (keep all your existing handler functions)
   const handleRegenerateSummary = () => {
     if (!window.confirm("This will overwrite any manual edits in the text area. Are you sure you want to regenerate the summary?")) {
       return;
@@ -242,19 +232,15 @@ export default function MeetingDetail() {
           FirefliesId: String(data?.id ?? ""), Title: data?.title ?? "",
           MeetingDate: data?.date ? new Date(data.date).toISOString() : null,
           DurationSeconds: Math.round(Number(data?.duration ?? 0)),
-
-
           TranscriptJson: JSON.stringify(data?.sentences ?? []),
           Summary: data?.summary?.overview ?? data?.summary?.short_summary ?? "",
           BulletGist: data.summary?.bullet_gist ?? null,
-
           ActionItems: Array.isArray(data.summary?.action_items) 
             ? JSON.stringify(data.summary.action_items) 
             : data.summary?.action_items ?? null,
           Keywords: Array.isArray(data.summary?.keywords) 
             ? JSON.stringify(data.summary.keywords) 
             : data.summary?.keywords ?? null,
-
             ExtendedSectionsJson: JSON.stringify(data.summary?.extended_sections ?? null),
           AudioUrl: data?.audio_url ?? null
       };
@@ -270,7 +256,7 @@ export default function MeetingDetail() {
 
   async function downloadSummaryFile() {
     if (!dbId) return alert("Meeting not saved yet.");
-    const blob = new Blob([summaryText], { type: 'text/plain' });
+    const blob = new Blob([summary], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -280,6 +266,23 @@ export default function MeetingDetail() {
     a.remove();
     window.URL.revokeObjectURL(url);
   }
+
+  // New handler for file selection
+  const handleFileSelectionConfirm = (selectedFileIds) => {
+    setShowFileSelectionModal(false);
+    if (dbId) {
+      // Navigate to the generate files route with selected files in state
+      navigate(`/generate-files/${dbId}`, { 
+        state: { 
+          summary, 
+          meetingId: id,
+          selectedFiles: selectedFileIds
+        } 
+      });
+    } else {
+      alert("Meeting not saved in DB yet. Please wait.");
+    }
+  };
   
   if (loading || !summaryPreferences) return <LoadingSkeleton />;
   if (!meeting) return <div style={{ textAlign: "center", marginTop: "60px" }}>Meeting not found.</div>;
@@ -287,110 +290,99 @@ export default function MeetingDetail() {
   const d = parseDate(meeting.date);
   const audioSrc = meeting?.audio_url ? (meeting.audio_url.startsWith('http') ? meeting.audio_url : `${API}${meeting.audio_url}`) : null;
 
-
-  console.log("Meeting Data:", meeting);
-
   return (
     <div style={{ padding: "24px", maxWidth: "1000px", margin: "auto", fontFamily: "'Inter', sans-serif", backgroundColor: '#f8fafc', color: '#0f172a' }}>
       
-      
+      {/* ... (keep all your existing JSX for header, customize summary section, and summary section) */}
       <header
-  style={{
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "22px 28px",
-    marginBottom: "36px",
-    borderRadius: "24px",
-    background: "linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)",
-    boxShadow: "0 12px 40px -8px rgba(22, 34, 51, 0.08)",
-    border: "1px solid rgba(226, 232, 240, 0.6)",
-    backdropFilter: "blur(12px)",
-  }}
->
-  {/* Left Section: Back Button + Title */}
-  <div style={{ display: "flex", alignItems: "center", gap: "20px", minWidth: 0 }}>
-    {/* Back Button */}
-    <button
-      onClick={() => navigate(-1)}
-      aria-label="Go back"
-      style={{
-        backgroundColor: "#f8fafc",
-        border: "1px solid #e2e8f0",
-        borderRadius: "16px",
-        width: "50px",
-        height: "50px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        transition: "all 0.25s ease",
-        color: "#334155",
-        flexShrink: 0,
-        boxShadow: "0 4px 8px rgba(0,0,0,0.04)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-2px) scale(1.05)";
-        e.currentTarget.style.boxShadow = "0 8px 16px rgba(0,0,0,0.08)";
-        e.currentTarget.style.backgroundColor = "#f1f5f9";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0) scale(1)";
-        e.currentTarget.style.boxShadow = "0 4px 8px rgba(0,0,0,0.04)";
-        e.currentTarget.style.backgroundColor = "#f8fafc";
-      }}
-    >
-      <ArrowLeftFromLine size={22} />
-    </button>
-
-    {/* Meeting Title + Metadata */}
-    <div style={{ minWidth: 0 }}>
-      <h1
         style={{
-          margin: 0,
-          fontWeight: 800,
-          fontSize: "1.9rem",
-          letterSpacing: "-0.03em",
-          color: "#0f172a",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-        title={meeting.title}
-      >
-        {meeting.title}
-      </h1>
-      <div
-        style={{
-          marginTop: "10px",
-          fontSize: "1rem",
-          fontWeight: 500,
-          color: "#475569",
           display: "flex",
           alignItems: "center",
-          gap: "18px",
+          justifyContent: "space-between",
+          padding: "22px 28px",
+          marginBottom: "36px",
+          borderRadius: "24px",
+          background: "linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)",
+          boxShadow: "0 12px 40px -8px rgba(22, 34, 51, 0.08)",
+          border: "1px solid rgba(226, 232, 240, 0.6)",
+          backdropFilter: "blur(12px)",
         }}
       >
-        {/* Date with Icon */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span style={{ fontSize: "1.1rem" }}>📅</span>
-          <span>{d ? d.toLocaleDateString(undefined, { dateStyle: "long" }) : ""}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "20px", minWidth: 0 }}>
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Go back"
+            style={{
+              backgroundColor: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: "16px",
+              width: "50px",
+              height: "50px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "all 0.25s ease",
+              color: "#334155",
+              flexShrink: 0,
+              boxShadow: "0 4px 8px rgba(0,0,0,0.04)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px) scale(1.05)";
+              e.currentTarget.style.boxShadow = "0 8px 16px rgba(0,0,0,0.08)";
+              e.currentTarget.style.backgroundColor = "#f1f5f9";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0) scale(1)";
+              e.currentTarget.style.boxShadow = "0 4px 8px rgba(0,0,0,0.04)";
+              e.currentTarget.style.backgroundColor = "#f8fafc";
+            }}
+          >
+            <ArrowLeftFromLine size={22} />
+          </button>
+
+          <div style={{ minWidth: 0 }}>
+            <h1
+              style={{
+                margin: 0,
+                fontWeight: 800,
+                fontSize: "1.9rem",
+                letterSpacing: "-0.03em",
+                color: "#0f172a",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+              title={meeting.title}
+            >
+              {meeting.title}
+            </h1>
+            <div
+              style={{
+                marginTop: "10px",
+                fontSize: "1rem",
+                fontWeight: 500,
+                color: "#475569",
+                display: "flex",
+                alignItems: "center",
+                gap: "18px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "1.1rem" }}>📅</span>
+                <span>{d ? d.toLocaleDateString(undefined, { dateStyle: "long" }) : ""}</span>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "1.1rem" }}>⏱️</span>
+                <span>{Math.round(meeting.duration)} Minutes</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Duration with Icon */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span style={{ fontSize: "1.1rem" }}>⏱️</span>
-          <span>{Math.round(meeting.duration)} Minutes</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {/* Right Section (Future buttons if needed) */}
-  <div></div>
-</header>
-
-
+        <div></div>
+      </header>
       
       <section className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
@@ -535,37 +527,35 @@ export default function MeetingDetail() {
             }}
           />
         )}
-        <div style={{ marginTop: "20px", display: "flex", gap: "16px", justifyContent: "space-between"  }}>
-          
-          <button
-            onClick={handleSaveAll}
-            disabled={!dbId || saving}
-            aria-live="polite"
-            className="btn btn-primary"
-          >
-            {saving ? "Updating..." : "Update Summary"}
-          </button>
-          <button
-                onClick={() => {
-                    if (dbId) {
-                        // Navigate to the new route, passing dbId and summary as state
-                        navigate(`/generate-files/${dbId}`, { state: { summary, meetingId: id } });
-                    } else {
-                        alert("Meeting not saved in DB yet. Please wait.");
-                    }
-                }}
-                disabled={!dbId} // Disable if dbId is not available
-                className="btn btn-secondary"
-            >
-                Next
-            </button>
-        </div>
-      </section>
+        <div style={{ marginTop: "20px", display: "flex", gap: "16px", justifyContent: "space-between"  }}>
+          
+          <button
+            onClick={handleSaveAll}
+            disabled={!dbId || saving}
+            aria-live="polite"
+            className="btn btn-primary"
+          >
+            {saving ? "Updating..." : "Update Summary"}
+          </button>
+          
+          {/* Modified Next button to show file selection modal */}
+          <button
+            onClick={() => {
+              if (dbId) {
+                setShowFileSelectionModal(true);
+              } else {
+                alert("Meeting not saved in DB yet. Please wait.");
+              }
+            }}
+            disabled={!dbId}
+            className="btn btn-secondary"
+          >
+            Next
+          </button>
+        </div>
+      </section>
 
-      
-
-   
-
+      {/* Transcript section - keep existing code */}
       <div style={{ marginBottom: "16px" }}>
         <button onClick={() => setTranscriptOpen((open) => !open)} className="btn btn-ghost">
           {transcriptOpen ? "Hide Transcript ▲" : "Show Transcript ▼"}
@@ -592,6 +582,13 @@ export default function MeetingDetail() {
           </div>
         )}
       </section>
+
+      {/* Add the File Selection Modal */}
+      <FileSelectionModal
+        isOpen={showFileSelectionModal}
+        onClose={() => setShowFileSelectionModal(false)}
+        onConfirm={handleFileSelectionConfirm}
+      />
 
       {/* CSS */}
       <style>{`

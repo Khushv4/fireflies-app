@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeftFromLine,
   Save,
@@ -15,13 +15,36 @@ import gsap from "gsap";
 
 const API = import.meta.env.VITE_API_BASE_URL || "";
 
+// File configuration mapping
+const FILE_CONFIG = {
+  functional: {
+    name: "FunctionalDoc.txt",
+    title: "Functional Document",
+    description: "Detailed functional requirements and specifications"
+  },
+  mockups: {
+    name: "Mockups.txt", 
+    title: "Mockups",
+    description: "UI/UX mockups and design specifications"
+  },
+  markdown: {
+    name: "Markdown.md",
+    title: "Markdown File", 
+    description: "Formatted markdown documentation"
+  }
+};
+
 export default function GenerateFiles() {
   const { dbId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get selected files from navigation state
+  const selectedFiles = location.state?.selectedFiles || ['functional', 'mockups', 'markdown']; // fallback to all files
 
   const [files, setFiles] = useState([]);
   const [editingFiles, setEditingFiles] = useState([]);
-  const [isEditing, setIsEditing] = useState([false, false, false]); // edit toggle
+  const [isEditing, setIsEditing] = useState([]); // dynamic based on selected files
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -40,6 +63,16 @@ export default function GenerateFiles() {
   const viewPlanBtnRef = useRef(null);
   const modalRef = useRef(null);
 
+  // Create filtered file list based on selected files
+  const getFilteredFiles = () => {
+    return selectedFiles.map(fileId => ({
+      id: fileId,
+      name: FILE_CONFIG[fileId].name,
+      title: FILE_CONFIG[fileId].title,
+      description: FILE_CONFIG[fileId].description
+    }));
+  };
+
   useEffect(() => {
     async function initializeFilesAndCheckPlan() {
       if (!dbId) {
@@ -48,21 +81,38 @@ export default function GenerateFiles() {
       }
       setLoading(true);
       setError(null);
+      
       try {
+        // Initialize editing state based on selected files
+        setIsEditing(new Array(selectedFiles.length).fill(false));
+
         const filesRes = await fetch(
           `${API}/api/meetings/${dbId}/generate-files`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            // Pass selected file types to backend
+            body: JSON.stringify({ selectedFiles })
           }
         );
 
         if (!filesRes.ok) {
           throw new Error(`Failed to load files: ${await filesRes.text()}`);
         }
+        
         const filesData = await filesRes.json();
-        setFiles(filesData);
-        setEditingFiles(filesData.map((f) => f.content ?? ""));
+        
+        // Filter the response to only include selected files
+        const filteredFiles = getFilteredFiles().map((config, index) => {
+          const matchingFile = filesData.find(f => f.name === config.name);
+          return matchingFile || { 
+            name: config.name, 
+            content: `Generated ${config.title} content will appear here...` 
+          };
+        });
+        
+        setFiles(filteredFiles);
+        setEditingFiles(filteredFiles.map(f => f.content ?? ""));
 
         const planRes = await fetch(`${API}/api/meetings/${dbId}/project-plan`);
         if (planRes.ok) {
@@ -83,27 +133,25 @@ export default function GenerateFiles() {
       }
     }
     initializeFilesAndCheckPlan();
-  }, [dbId]);
+  }, [dbId, selectedFiles]);
 
   async function handleSave() {
     if (!dbId) return;
     setSaving(true);
     setError(null);
+    
     try {
-      const payload =
-        files.length === editingFiles.length
-          ? files.map((f, i) => ({ name: f.name, content: editingFiles[i] }))
-          : [
-              { name: "FunctionalDoc.txt", content: editingFiles[0] ?? "" },
-              { name: "Mockups.txt", content: editingFiles[1] ?? "" },
-              { name: "Markdown.md", content: editingFiles[2] ?? "" },
-            ];
+      const payload = files.map((f, i) => ({ 
+        name: f.name, 
+        content: editingFiles[i] 
+      }));
 
       const res = await fetch(`${API}/api/meetings/${dbId}/files`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      
       if (!res.ok) throw new Error(await res.text());
       alert("Files saved successfully!");
     } catch (err) {
@@ -229,13 +277,20 @@ export default function GenerateFiles() {
     );
   }
 
+  const filteredFileConfigs = getFilteredFiles();
+
   return (
     <div ref={pageRef} className="max-w-5xl mx-auto px-6 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
-          Generate & Edit Meeting Files
-        </h2>
+        <div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+            Generate & Edit Meeting Files
+          </h2>
+          <p className="text-gray-600 mt-2">
+            Editing {selectedFiles.length} selected file{selectedFiles.length !== 1 ? 's' : ''}
+          </p>
+        </div>
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition shadow-sm"
@@ -245,20 +300,25 @@ export default function GenerateFiles() {
         </button>
       </div>
 
-      {/* File Editors */}
+      {/* File Editors - Only show selected files */}
       <div className="space-y-8">
-        {["FunctionalDoc.txt", "Mockups.txt", "Markdown.md"].map(
-          (filename, idx) => (
+        {filteredFileConfigs.map((config, idx) => {
+          const fileData = files[idx];
+          
+          return (
             <div
-              key={filename}
+              key={config.id}
               ref={(el) => (cardRefs.current[idx] = el)}
               className="p-6 rounded-2xl bg-white/80 shadow-lg backdrop-blur-md border border-gray-200 transition hover:shadow-2xl hover:scale-[1.01] duration-300 ease-in-out"
             >
               {/* Title with edit + download */}
               <div className="flex items-center justify-between mb-3">
-                <label className="block text-lg font-semibold text-gray-800">
-                  {filename}
-                </label>
+                <div>
+                  <label className="block text-lg font-semibold text-gray-800">
+                    {config.title}
+                  </label>
+                  <p className="text-sm text-gray-500">{config.description}</p>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
@@ -276,7 +336,7 @@ export default function GenerateFiles() {
                   </button>
                   <button
                     onClick={() =>
-                      handleDownload(filename, editingFiles[idx] ?? "")
+                      handleDownload(config.name, editingFiles[idx] ?? "")
                     }
                     className="p-2 rounded-lg hover:bg-gray-100 transition"
                     title="Download File"
@@ -333,8 +393,8 @@ export default function GenerateFiles() {
                 )}
               </div>
             </div>
-          )
-        )}
+          );
+        })}
       </div>
 
       {/* Buttons */}
