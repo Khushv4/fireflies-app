@@ -30,10 +30,11 @@ export default function Home() {
         const total = meetings.length;
         const saved = meetings.filter(m => m.summary && m.summary.length > 0).length;
         const plans = meetings.filter(m => m.hasProjectPlan).length;
-        const avgDur = total > 0 ? Math.round(meetings.reduce((a, b) => a + (b.durationSeconds || 0), 0) / total / 60) : 0;
+        const avgDur = total > 0 ? Math.round(meetings.reduce((a, b) => a + (b.DurationSeconds || 0), 0) / total / 60) : 0;
 
         setStats({ totalMeetings: total, saved, plansGenerated: plans, avgDuration: avgDur });
         setRecentMeetings(meetings.slice(0, 6));
+        console.log("Dashboard data:", { totalMeetings: total, saved, plansGenerated: plans, avgDuration: avgDur });
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
       } finally {

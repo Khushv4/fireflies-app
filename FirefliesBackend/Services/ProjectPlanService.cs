@@ -47,8 +47,18 @@ Generate a detailed project plan with the following structure:
 6. **Timeline** - Visual timeline with dependencies
 7. **Success Metrics** - How to measure project success
 
-Format the response in clean, structured markdown with clear headings, bullet points, and tables where appropriate.
-Make sure the plan is realistic for the given {durationWeeks}-week(5 days a week) timeframe.
+FORMAT:
+- Use markdown headers (##, ###)
+- Create tables for daily schedules
+- Keep descriptions concise but actionable
+- Assume 5 working days per week
+- Focus on deliverables, not processes
+
+DAILY SCHEDULE FORMAT:
+| Week | Day | Task | Deliverable | Owner |
+|------|-----|------|------------|-------|
+
+Be specific, realistic, and ensure tasks build upon each other logically.
 ".Trim();
 
             var body = new
@@ -236,7 +246,7 @@ Make sure the plan is realistic for the given {durationWeeks}-week(5 days a week
         }
 
         private static string TruncateIntelligently(List<DocumentSection> sections, int maxChars)
-        {
+        { 
             var result = new StringBuilder();
             result.AppendLine($"=== SMART-TRUNCATED PROJECT DOCUMENTATION (optimized from larger source) ===\n");
             

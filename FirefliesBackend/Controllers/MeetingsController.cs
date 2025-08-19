@@ -1,3 +1,4 @@
+
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using FirefliesBackend.Data;
@@ -34,22 +35,25 @@ namespace FirefliesBackend.Controllers
         public async Task<IActionResult> GetAllMeetings()
         {
             var meetings = await _db.Meetings
-                .OrderByDescending(m => m.CreatedAt)
+                .OrderByDescending(m => m.MeetingDate)
                 .Select(m => new
                 {
                     id = m.Id,
                     firefliesId = m.FirefliesId,
                     title = m.Title,
                     createdAt = m.CreatedAt,
+
                     meetingDate = m.MeetingDate,
                     summary = m.Summary,
-                    hasProjectPlan = !string.IsNullOrEmpty(m.ProjectPlan)
+                    hasProjectPlan = !string.IsNullOrEmpty(m.ProjectPlan),
+                    durationSeconds = m.DurationSeconds  
                 })
                 .ToListAsync();
 
             return Ok(meetings);
         }
 
+        //no changes but needed to change the download file name
         [HttpGet("{id}/download-summary")]
         public async Task<IActionResult> DownloadSummary(int id)
         {
@@ -66,36 +70,45 @@ namespace FirefliesBackend.Controllers
         public async Task<IActionResult> UpsertMeeting([FromBody] SaveMeetingDto dto)
         {
             if (dto == null || string.IsNullOrWhiteSpace(dto.FirefliesId))
+            {
                 return BadRequest("Invalid payload - FirefliesId required.");
+            }
 
             try
             {
                 var meeting = await _db.Meetings.FirstOrDefaultAsync(m => m.FirefliesId == dto.FirefliesId);
 
-                DateTime meetingDateToSave = dto.MeetingDate.HasValue ? dto.MeetingDate.Value : DateTime.UtcNow;
-
                 if (meeting == null)
                 {
-                    meeting = new Meeting
-                    {
-                        FirefliesId = dto.FirefliesId,
-                        Title = dto.Title ?? "",
-                        MeetingDate = meetingDateToSave,
-                        DurationSeconds = (int)Math.Round(dto.DurationSeconds),
-                        TranscriptJson = dto.TranscriptJson ?? "",
-                        Summary = dto.Summary ?? ""
-                    };
+                    meeting = new Meeting { FirefliesId = dto.FirefliesId };
                     _db.Meetings.Add(meeting);
+                }
+
+                // Update all properties from the DTO
+                meeting.Title = dto.Title ?? "";
+                
+                    Console.WriteLine($"[LOG 2 - MeetingsController UPSERT]: Frontend se aayi date: {dto.MeetingDate}, Kind: {dto.MeetingDate?.Kind}");
+
+
+                // ✅ YAHI HAI ASLI AUR FINAL FIX
+                if (dto.MeetingDate.HasValue)
+                {
+                    meeting.MeetingDate = DateTime.SpecifyKind(dto.MeetingDate.Value, DateTimeKind.Utc);
                 }
                 else
                 {
-                    meeting.Title = dto.Title ?? meeting.Title;
-                    meeting.MeetingDate = meetingDateToSave;
-                    meeting.DurationSeconds = (int)Math.Round(dto.DurationSeconds);
-                    meeting.TranscriptJson = dto.TranscriptJson ?? meeting.TranscriptJson;
-                    meeting.Summary = dto.Summary ?? meeting.Summary;
+                    meeting.MeetingDate = null;
                 }
-
+                
+                meeting.DurationSeconds = (int)Math.Round(dto.DurationSeconds);
+                meeting.TranscriptJson = dto.TranscriptJson ?? "";
+                meeting.Summary = dto.Summary ?? "";
+                meeting.BulletGist = dto.BulletGist;
+                meeting.ActionItems = dto.ActionItems;
+                meeting.Keywords = dto.Keywords;
+                meeting.ExtendedSectionsJson = dto.ExtendedSectionsJson;
+                meeting.AudioUrl = dto.AudioUrl;
+                
                 await _db.SaveChangesAsync();
                 return Ok(new { id = meeting.Id, firefliesId = meeting.FirefliesId });
             }
@@ -106,17 +119,29 @@ namespace FirefliesBackend.Controllers
             }
         }
 
-        [HttpPut("{id}/summary")]
+           [HttpPut("{id}/summary")]
         public async Task<IActionResult> UpdateSummary(int id, [FromBody] UpdateSummaryDto dto)
         {
-            var meeting = await _db.Meetings.FindAsync(id);
-            if (meeting == null) return NotFound();
-
-            meeting.Summary = dto.Summary ?? meeting.Summary;
+            var m = await _db.Meetings.FindAsync(id);
+            if (m == null) return NotFound();
+            m.UserEditedSummary = dto.Summary; 
             await _db.SaveChangesAsync();
-
-            return Ok(new { message = "Summary updated." });
+            return NoContent();
         }
+
+        [HttpPut("{id}/preferences")]
+        public async Task<IActionResult> UpdatePreferences(int id, [FromBody] UpdatePreferencesDto dto)
+        {
+            var meeting = await _db.Meetings.FindAsync(id);
+            if (meeting == null)
+            {
+                return NotFound();
+            }
+            meeting.SummaryPreferencesJson = JsonSerializer.Serialize(dto.Preferences);
+            await _db.SaveChangesAsync();
+            return NoContent();
+        }
+
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
@@ -346,10 +371,15 @@ namespace FirefliesBackend.Controllers
         DateTime? MeetingDate,
         double DurationSeconds,
         string TranscriptJson,
-        string Summary
+        string Summary,
+        string? BulletGist,
+        string? ActionItems,
+        string? Keywords,
+        string? ExtendedSectionsJson,
+        string? AudioUrl
     );
 
     public record UpdateSummaryDto(string Summary);
-
+   public record UpdatePreferencesDto(JsonElement Preferences);
     public record UpdateProjectPlanDto(string ProjectPlan);
 }
