@@ -1,3 +1,4 @@
+// File: ProjectPlan.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -15,6 +16,8 @@ import {
   ListTodo,
   Sparkles,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const API = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -29,8 +32,8 @@ export default function ProjectPlan() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  
-  // New states for backlog generation
+
+  // Backlog-related states
   const [generatingBacklog, setGeneratingBacklog] = useState(false);
   const [backlogGenerated, setBacklogGenerated] = useState(false);
 
@@ -44,7 +47,6 @@ export default function ProjectPlan() {
   }, [dbId]);
 
   useEffect(() => {
-    // entrance animations for toolbar and content (adds small delay)
     if (toolbarRef.current) {
       toolbarRef.current.classList.remove("translate-y-6", "opacity-0");
       toolbarRef.current.classList.add("translate-y-0", "opacity-100");
@@ -55,7 +57,7 @@ export default function ProjectPlan() {
     }
   }, [planData]);
 
-  // fetch project plan from backend
+  // fetch project plan
   async function fetchProjectPlan(id) {
     setLoading(true);
     setError(null);
@@ -73,8 +75,6 @@ export default function ProjectPlan() {
       const data = await res.json();
       setPlanData(data);
       setEditedContent(cleanMarkdown(data.projectPlan ?? ""));
-      
-      // Check if backlog already exists
       await checkBacklogExists(id);
     } catch (err) {
       setError(err.message || "Failed to load project plan");
@@ -83,18 +83,15 @@ export default function ProjectPlan() {
     }
   }
 
-  // Check if backlog already exists for this meeting
   async function checkBacklogExists(id) {
     try {
       const res = await fetch(`${API}/api/meetings/${id}/backlog`);
       setBacklogGenerated(res.ok);
-    } catch (err) {
-      // Ignore errors - backlog doesn't exist
+    } catch {
       setBacklogGenerated(false);
     }
   }
 
-  // basic cleanup for DB text
   function cleanMarkdown(content) {
     if (!content) return "";
     return content
@@ -126,34 +123,24 @@ export default function ProjectPlan() {
     }
   }
 
-  // New function to generate backlog
   async function handleGenerateBacklog() {
     if (!dbId) return;
     setGeneratingBacklog(true);
     setError(null);
-    
+
     try {
       const res = await fetch(`${API}/api/meetings/${dbId}/generate-backlog`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText);
-      }
-      
-      const data = await res.json();
+
+      if (!res.ok) throw new Error(await res.text());
+
       setBacklogGenerated(true);
-      
-      // Show success message
-      setError(null);
-      
-      // Optionally navigate to backlog view after generation
+
       setTimeout(() => {
         navigate(`/meeting/${dbId}/backlog`);
       }, 1000);
-      
     } catch (err) {
       setError(err.message || "Failed to generate product backlog");
     } finally {
@@ -161,7 +148,6 @@ export default function ProjectPlan() {
     }
   }
 
-  // Navigate to backlog view
   function handleViewBacklog() {
     navigate(`/meeting/${dbId}/backlog`);
   }
@@ -185,27 +171,107 @@ export default function ProjectPlan() {
     navigate(-1);
   }
 
-  // Simple markdown renderer for display
-  function renderMarkdown(content) {
-    if (!content) return "";
-    
-    // Basic markdown-like rendering
-    return content
-      .replace(/^### (.*$)/gim, '<h3 class="text-xl md:text-2xl font-semibold mt-5 mb-2 text-gray-700">$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2 class="text-2xl md:text-3xl font-bold mt-6 mb-3 text-gray-800">$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1 class="text-3xl md:text-4xl font-extrabold mt-8 mb-4 pb-3 border-b border-gray-100 text-gray-900">$1</h1>')
-      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
-      .replace(/\*(.*)\*/gim, '<em>$1</em>')
-      .replace(/\n/gim, '<br />');
-  }
+   // ---------- enhanced heading UI in mdComponents ----------
+  const mdComponents = {
+    // H1: Large hero-like header with icon and gradient text
+    h1: ({ node, children, ...props }) => (
+      <div className="flex items-center gap-4 mt-10 mb-6 pb-4 border-b border-gray-100">
+        <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 text-white shadow-sm">
+          <FileText className="w-6 h-6" />
+        </div>
+        <div>
+          <h1
+            className="text-3xl md:text-4xl font-extrabold gradient-text leading-tight"
+            {...props}
+          >
+            {children}
+          </h1>
+          {/* subtitle area — optional, will be empty if no following inline text */}
+          <div className="mt-1 text-sm text-gray-500">
+            {/* Keep this space light for optional descriptions in your markdown */}
+          </div>
+        </div>
+      </div>
+    ),
 
+    // H2: Section header with vertical accent bar and subtle uppercase label
+    h2: ({ node, children, ...props }) => (
+      <div className="flex items-center gap-3 mt-8 mb-4">
+        <div className="w-1 h-8 rounded-full bg-gradient-to-b from-indigo-500 to-purple-600" />
+        <h2
+          className="text-2xl md:text-3xl font-bold text-gray-800"
+          {...props}
+        >
+          {children}
+        </h2>
+      </div>
+    ),
+
+    // H3: Smaller header with left accent and soft background
+    h3: ({ node, children, ...props }) => (
+      <h3
+        className="text-xl md:text-2xl font-semibold mt-6 mb-3 text-gray-700 pl-4 border-l-4 border-indigo-300 bg-indigo-50/40 py-2 rounded-r-lg"
+        {...props}
+      >
+        {children}
+      </h3>
+    ),
+
+    // paragraphs, lists, tables, code, blockquote preserved (slightly adjusted look)
+    p: ({ node, ...props }) => (
+      <p className="leading-relaxed mb-3 text-gray-700 text-base" {...props} />
+    ),
+    li: ({ node, ordered, ...props }) => (
+      <li
+        className={`mb-2 ${ordered ? "list-decimal ml-6" : "ml-6 list-disc"}`}
+        {...props}
+      />
+    ),
+    table: ({ node, ...props }) => (
+      <div className="overflow-x-auto my-4">
+        <table className="min-w-full border-collapse text-sm" {...props} />
+      </div>
+    ),
+    th: ({ node, ...props }) => (
+      <th
+        className="border-b-2 border-gray-200 text-left px-3 py-2 bg-gradient-to-r from-indigo-50 to-blue-50 font-semibold"
+        {...props}
+      />
+    ),
+    td: ({ node, ...props }) => (
+      <td className="border-b border-gray-100 px-3 py-2 align-top" {...props} />
+    ),
+    code: ({ inline, className, children, ...props }) =>
+      inline ? (
+        <code
+          className="bg-indigo-50 px-1 py-0.5 rounded text-sm font-mono text-indigo-700"
+          {...props}
+        >
+          {children}
+        </code>
+      ) : (
+        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-xs">
+          <code className={className} {...props}>
+            {children}
+          </code>
+        </pre>
+      ),
+    blockquote: ({ node, ...props }) => (
+      <blockquote
+        className="border-l-4 border-indigo-200 pl-4 italic text-gray-600 my-4 bg-indigo-50/40 py-3 rounded"
+        {...props}
+      />
+    ),
+  };
   // loading
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 px-6">
         <div className="text-center">
           <Loader2 className="animate-spin w-14 h-14 text-indigo-500 mx-auto mb-4" />
-          <div className="text-lg font-medium text-gray-700">Loading project plan...</div>
+          <div className="text-lg font-medium text-gray-700">
+            Loading project plan...
+          </div>
         </div>
       </div>
     );
@@ -219,8 +285,12 @@ export default function ProjectPlan() {
           <div className="flex items-center gap-4 mb-4">
             <AlertIcon />
             <div>
-              <h3 className="text-xl font-bold text-gray-900">No project plan found</h3>
-              <p className="text-sm text-gray-600 mt-1">{error || "There is no project plan stored for this meeting."}</p>
+              <h3 className="text-xl font-bold text-gray-900">
+                No project plan found
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {error || "There is no project plan stored for this meeting."}
+              </p>
             </div>
           </div>
           <div className="flex gap-3 mt-6 justify-end">
@@ -241,7 +311,6 @@ export default function ProjectPlan() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto px-6 py-8">
-
         {/* Top bar */}
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-start gap-4">
@@ -249,7 +318,9 @@ export default function ProjectPlan() {
               <FileText className="w-7 h-7 text-white drop-shadow-sm" />
             </div>
             <div>
-              <h1 className="text-3xl md:text-4xl font-extrabold">Project Plan</h1>
+              <h1 className="text-3xl md:text-4xl font-extrabold">
+                Project Plan
+              </h1>
               <div className="mt-2 text-sm text-gray-600 flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-indigo-500" />
@@ -257,61 +328,79 @@ export default function ProjectPlan() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-green-500" />
-                  <span>Generated {planData.generatedAt ? new Date(planData.generatedAt).toLocaleDateString() : "—"}</span>
+                  <span>
+                    Generated{" "}
+                    {planData.generatedAt
+                      ? new Date(planData.generatedAt).toLocaleDateString()
+                      : "—"}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* icon toolbar */}
-          <div
-            ref={toolbarRef}
-            className="flex items-center gap-3 translate-y-6 opacity-0 transition-all duration-500"
-          >
-            <IconCircle
-              title="Back"
-              onClick={handleBack}
-              accent="from-gray-50 to-white"
-              accentHover="from-gray-100 to-white"
-              icon={<ArrowLeftFromLine className="w-4 h-4 text-gray-700" />}
-            />
+          {/* Toolbar */}
+          {/* Toolbar */}
+<div
+  ref={toolbarRef}
+  className="flex items-center gap-3 opacity-100 translate-y-0"
+>
+  <IconCircle 
+  title="Back" 
+  onClick={handleBack} 
+  accent="from-gray-50 to-white" 
+  accentHover="from-gray-100 to-white" 
+  animateFloat
+  icon={<ArrowLeftFromLine className="w-4 h-4 text-gray-700" />} 
+  animateOnClick="animate-bounce-left"
+/>
 
-            <IconCircle
-              title={isEditing ? "Preview" : "Edit"}
-              onClick={() => setIsEditing((s) => !s)}
-              accent="from-indigo-50 to-blue-50"
-              accentHover="from-indigo-200 to-blue-200"
-              animateFloat
-              icon={isEditing ? <Eye className="w-4 h-4 text-indigo-700" /> : <Edit3 className="w-4 h-4 text-indigo-700" />}
-            />
+  <IconCircle
+    title={isEditing ? "Preview" : "Edit"}
+    onClick={() => setIsEditing((s) => !s)}
+    accent="from-indigo-50 to-blue-50"
+    accentHover="from-indigo-200 to-blue-200"
+    animateFloat
+    icon={
+      isEditing ? (
+        <Eye className="w-4 h-4 text-indigo-700" />
+      ) : (
+        <Edit3 className="w-4 h-4 text-indigo-700" />
+      )
+    }
+  />
 
-            <div className="relative">
-              <IconCircle
-                title="Save"
-                onClick={handleSave}
-                disabled={!isEditing || saving}
-                accent="from-emerald-50 to-green-50"
-                accentHover="from-emerald-200 to-green-200"
-                icon={saving ? <Loader2 className="w-4 h-4 animate-spin text-green-600" /> : <Save className="w-4 h-4 text-green-600" />}
-              />
-              {saveSuccess && (
-                <span className="absolute -top-2 -right-2 bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-lg animate-pop">
-                  <Check className="w-3.5 h-3.5" />
-                </span>
-              )}
-            </div>
+  <div className="relative">
+    <IconCircle 
+  title="Save" 
+  onClick={handleSave} 
+  disabled={!isEditing || saving} 
+  accent="from-emerald-50 to-green-50" 
+  accentHover="from-emerald-200 to-green-200" 
+  animateFloat
+  icon={saving ? <Loader2 className="w-4 h-4 animate-spin text-green-600" /> : <Save className="w-4 h-4 text-green-600" />} 
+  animateOnClick="animate-pulse-save"
+/>
+    {saveSuccess && (
+      <span className="absolute -top-2 -right-2 bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-lg animate-pop">
+        <Check className="w-3.5 h-3.5" />
+      </span>
+    )}
+  </div>
 
-            <IconCircle
-              title="Download (.md)"
-              onClick={handleDownload}
-              accent="from-indigo-50 to-indigo-100"
-              accentHover="from-indigo-300 to-indigo-400"
-              icon={<Download className="w-4 h-4 text-indigo-700" />}
-            />
-          </div>
+  <IconCircle 
+  title="Download (.md)" 
+  onClick={handleDownload} 
+  accent="from-purple-50 to-purple-100" 
+  accentHover="from-purple-300 to-purple-400" 
+  animateFloat
+  icon={<Download className="w-4 h-4 text-purple-700" />} 
+  animateOnClick="animate-spin-download"
+/>
+</div>
         </div>
 
-        {/* Backlog Generation Section */}
+         {/* Backlog Generation Section */}
         <div className="mb-6 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 rounded-2xl p-6 border border-purple-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -373,34 +462,50 @@ export default function ProjectPlan() {
           )}
         </div>
 
-        {/* content card */}
-        <div className="bg-white rounded-2xl shadow-xl border overflow-hidden">
-          <div className="p-6 border-b">
-            <p className="text-sm text-gray-600">
-              <strong className="text-gray-800">Meeting:</strong> {planData.meetingTitle ?? planData.FirefliesId ?? "—"}
-            </p>
-          </div>
 
-          <div className="h-[72vh] overflow-y-auto" ref={contentRef}>
-            {isEditing ? (
-              <div className="p-6">
-                <textarea
-                  value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
-                  className="w-full h-[66vh] resize-none font-mono text-sm p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
-                  placeholder="Edit your project plan in Markdown..."
-                />
-              </div>
-            ) : (
-              <div className="p-6 prose prose-lg max-w-none">
-                <div 
-                  className="leading-relaxed text-gray-700"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(editedContent) }}
-                />
-              </div>
-            )}
-          </div>
+
+        {/* content card */}
+        {/* content card */}
+<div className="bg-white rounded-2xl shadow-xl border overflow-hidden">
+  {/* Card Header */}
+  <div className="bg-gradient-to-r from-indigo-50 via-blue-50 to-slate-50 px-6 py-4 border-b">
+    <p className="text-sm text-gray-700">
+      <strong className="text-gray-900">Meeting:</strong>{" "}
+      {planData.meetingTitle ?? planData.FirefliesId ?? "—"}
+    </p>
+  </div>
+
+  {/* Content Area */}
+  <div className="relative h-[72vh] overflow-y-auto" ref={contentRef}>
+    {isEditing ? (
+      <div className="p-6 relative">
+        <textarea
+          value={editedContent}
+          onChange={(e) => setEditedContent(e.target.value)}
+          className="w-full h-[66vh] resize-none font-mono text-sm p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-slate-50 shadow-inner"
+          placeholder="✍️ Start editing your project plan in Markdown..."
+        />
+        {/* Sticky Save Reminder */}
+        <div className="absolute bottom-4 right-6 text-xs text-gray-500">
+          💾 Don’t forget to save your changes
         </div>
+      </div>
+    ) : (
+      <div className="p-8 prose prose-lg max-w-none bg-gradient-to-b from-white via-slate-50 to-white relative">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={mdComponents}
+        >
+          {editedContent}
+        </ReactMarkdown>
+
+        {/* Background flair */}
+        <div className="absolute top-10 right-10 w-40 h-40 bg-indigo-100 rounded-full blur-3xl opacity-20 pointer-events-none" />
+        <div className="absolute bottom-10 left-10 w-56 h-56 bg-purple-100 rounded-full blur-3xl opacity-20 pointer-events-none" />
+      </div>
+    )}
+  </div>
+</div>
 
         {/* error toast */}
         {error && (
@@ -420,8 +525,25 @@ export default function ProjectPlan() {
         )}
       </div>
 
-      {/* animations & helpers */}
+      {/* animations */}
       <style>{`
+        @keyframes bounceLeft {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-6px); }
+}
+@keyframes pulseSave {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
+@keyframes spinDownload {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(360deg) scale(0.9); }
+  100% { transform: rotate(720deg) scale(1); }
+}
+
+.animate-bounce-left { animation: bounceLeft 0.5s ease; }
+.animate-pulse-save { animation: pulseSave 0.6s ease; }
+.animate-spin-download { animation: spinDownload 0.6s ease; }
         @keyframes floaty {
           0% { transform: translateY(0); }
           50% { transform: translateY(-6px); }
@@ -439,51 +561,81 @@ export default function ProjectPlan() {
   );
 }
 
-/* ---------- small presentational helpers ---------- */
+/* ---------- helpers ---------- */
 
-// circular icon button used in the toolbar
-function IconCircle({
-  children,
-  icon,
-  title,
-  onClick,
-  className = "",
-  disabled = false,
-  accent = "from-white to-white",
-  accentHover = "from-white to-white",
+function IconCircle({ 
+  children, 
+  icon, 
+  title, 
+  onClick, 
+  className = "", 
+  disabled = false, 
+  accent = "from-white to-white", 
+  accentHover = "from-white to-white", 
   animateFloat = false,
+  animateOnClick = ""   // <--- NEW
 }) {
-  // use children for fallback, but prefer icon prop
+  const [clicked, setClicked] = useState(false);
   const content = icon || children;
+
+  function handleClick(e) {
+    if (disabled) return;
+    if (onClick) onClick(e);
+
+    if (animateOnClick) {
+      setClicked(true);
+      setTimeout(() => setClicked(false), 600); // reset animation
+    }
+  }
+
   return (
     <button
       title={title}
       aria-label={title}
-      onClick={disabled ? undefined : onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
-        relative w-11 h-11 rounded-full flex items-center justify-center transition transform active:scale-95 shadow-sm
-        ${className}
+        relative w-11 h-11 rounded-full flex items-center justify-center
         bg-gradient-to-br ${accent}
-        hover:from-indigo-400 hover:to-blue-500
-        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-200
-        ${disabled ? "opacity-50 cursor-not-allowed" : "hover:scale-105"}
+        shadow-sm transition-all duration-300 ease-out
+        active:scale-95
+        ${className}
+        ${disabled 
+          ? "opacity-50 cursor-not-allowed" 
+          : "hover:scale-110 hover:rotate-6 hover:shadow-xl hover:from-purple-400 hover:to-indigo-500"
+        }
+        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-200
+        ${clicked ? animateOnClick : ""}
       `}
     >
-      <span className={`flex items-center justify-center ${animateFloat ? "animate-float" : ""}`}>
+      <span
+        className={`
+          flex items-center justify-center transform transition-transform duration-300
+          ${animateFloat ? "animate-float" : ""}
+        `}
+      >
         {content}
       </span>
     </button>
   );
 }
 
+
 function AlertIcon() {
   return (
-    <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-600">
-        <path d="M12 9v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M12 17h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="currentColor"/>
+    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
+      <svg
+        className="w-7 h-7 text-rose-600"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 9v2m0 4h.01M4.93 4.93a10 10 0 1014.14 0 10 10 0 00-14.14 0z"
+        />
       </svg>
     </div>
   );

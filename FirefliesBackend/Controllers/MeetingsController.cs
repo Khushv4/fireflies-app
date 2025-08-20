@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using FirefliesBackend.Data;
@@ -45,11 +44,11 @@ namespace FirefliesBackend.Controllers
                     firefliesId = m.FirefliesId,
                     title = m.Title,
                     createdAt = m.CreatedAt,
-
                     meetingDate = m.MeetingDate,
                     summary = m.Summary,
                     hasProjectPlan = !string.IsNullOrEmpty(m.ProjectPlan),
                     durationSeconds = m.DurationSeconds  
+                    // Note: OrganizerEmail is intentionally not included in response as per requirement
                 })
                 .ToListAsync();
 
@@ -70,8 +69,6 @@ namespace FirefliesBackend.Controllers
             var bytes = Encoding.UTF8.GetBytes(textContent);
             return File(bytes, "text/plain", "summary.txt");
         }
-
-
 
         // Endpoint to upsert a meeting
         // This will create a new meeting or update an existing one based on FirefliesId
@@ -97,8 +94,7 @@ namespace FirefliesBackend.Controllers
                 // Update all properties from the DTO
                 meeting.Title = dto.Title ?? "";
                 
-                    Console.WriteLine($"[LOG 2 - MeetingsController UPSERT]: Frontend se aayi date: {dto.MeetingDate}, Kind: {dto.MeetingDate?.Kind}");
-
+                Console.WriteLine($"[LOG 2 - MeetingsController UPSERT]: Frontend se aayi date: {dto.MeetingDate}, Kind: {dto.MeetingDate?.Kind}");
 
                 // Ensure MeetingDate is always UTC
                 if (dto.MeetingDate.HasValue)
@@ -118,6 +114,7 @@ namespace FirefliesBackend.Controllers
                 meeting.Keywords = dto.Keywords;
                 meeting.ExtendedSectionsJson = dto.ExtendedSectionsJson;
                 meeting.AudioUrl = dto.AudioUrl;
+                // Note: OrganizerEmail is not updated through DTO as it comes from Fireflies API only
                 
                 await _db.SaveChangesAsync();
                 return Ok(new { id = meeting.Id, firefliesId = meeting.FirefliesId });
@@ -129,10 +126,9 @@ namespace FirefliesBackend.Controllers
             }
         }
 
-
         // Endpoint to save transcript from Fireflies
         
-           [HttpPut("{id}/summary")]
+        [HttpPut("{id}/summary")]
         public async Task<IActionResult> UpdateSummary(int id, [FromBody] UpdateSummaryDto dto)
         {
             var m = await _db.Meetings.FindAsync(id);
@@ -141,7 +137,6 @@ namespace FirefliesBackend.Controllers
             await _db.SaveChangesAsync();
             return NoContent();
         }
-
 
         // Endpoint to save meeting preferences
         // This will update the summary preferences for a meeting
@@ -175,10 +170,10 @@ namespace FirefliesBackend.Controllers
                 m.Summary,
                 m.TranscriptJson,
                 hasProjectPlan = !string.IsNullOrEmpty(m.ProjectPlan)
+                // Note: OrganizerEmail is intentionally not included in response as per requirement
             });
         }
 
-        
         // Endpoint to generate files from summary
         // This will call the OpenAI API to generate files based on the meeting summary
         // It will return the generated files as a JSON array
@@ -231,7 +226,6 @@ namespace FirefliesBackend.Controllers
             return Ok(files);
         }
 
-
         // Endpoint to get generated files for a meeting
         // This will return the files generated from the meeting summary
         // If no files were generated, it will return the default empty files
@@ -263,7 +257,6 @@ namespace FirefliesBackend.Controllers
             return Ok(built);
         }
 
-
         // Endpoint to update files for a meeting
         // This will save the files generated from the meeting summary
         // It will update the FunctionalDoc, Mockups, and Markdown properties of the meeting
@@ -284,7 +277,6 @@ namespace FirefliesBackend.Controllers
             await _db.SaveChangesAsync();
             return Ok(new { message = "Files updated." });
         }
-
 
         // Endpoint to generate a project plan based on the meeting files
         // This will call the OpenAI API to generate a project plan based on the FunctionalDoc, Mockups, and Markdown files
@@ -353,7 +345,6 @@ namespace FirefliesBackend.Controllers
             }
         }
 
-
         // Endpoint to get the project plan for a meeting
         // This will return the project plan generated from the meeting files
         // If no project plan was generated, it will return a 404 Not Found
@@ -376,7 +367,6 @@ namespace FirefliesBackend.Controllers
             });
         }
 
-
         // Endpoint to update the project plan for a meeting
 
         [HttpPut("{id}/project-plan")]
@@ -390,7 +380,6 @@ namespace FirefliesBackend.Controllers
 
             return Ok(new { message = "Project plan updated." });
         }
-
 
         // Endpoint to download project plan as a markdown file
         // This will return the project plan as a markdown file for download
@@ -408,108 +397,104 @@ namespace FirefliesBackend.Controllers
         }
 
         // Endpoint to generate a product backlog based on the project plan
-[HttpPost("{id}/generate-backlog")]
-public async Task<IActionResult> GenerateBacklog(int id)
-{
-    var meeting = await _db.Meetings.FindAsync(id);
-    if (meeting == null)
-        return NotFound("Meeting not found.");
-
-    // Check if project plan exists
-    if (string.IsNullOrWhiteSpace(meeting.ProjectPlan))
-        return BadRequest("No project plan found. Please generate a project plan first.");
-
-    // Prevent regeneration if backlog already exists
-    if (!string.IsNullOrWhiteSpace(meeting.Backlog))
-    {
-        return BadRequest("Product backlog already exists. You cannot generate it again.");
-    }
-
-    var apiKey = _configuration["OpenAI:ApiKey"];
-    if (string.IsNullOrWhiteSpace(apiKey))
-        return StatusCode(500, "OpenAI API key not configured.");
-
-    try
-    {
-        var client = _httpClientFactory.CreateClient("OpenAI");
-
-        var backlog = await BacklogService.GenerateBacklogFromProjectPlan(
-            client,
-            meeting.ProjectPlan,
-            apiKey
-        );
-
-        meeting.Backlog = backlog;
-        meeting.BacklogGeneratedAt = DateTime.UtcNow;
-
-        await _db.SaveChangesAsync();
-
-        return Ok(new BacklogResponse
+        [HttpPost("{id}/generate-backlog")]
+        public async Task<IActionResult> GenerateBacklog(int id)
         {
-            MeetingId = id,
-            Backlog = backlog,
-            GeneratedAt = meeting.BacklogGeneratedAt.Value
-        });
+            var meeting = await _db.Meetings.FindAsync(id);
+            if (meeting == null)
+                return NotFound("Meeting not found.");
+
+            // Check if project plan exists
+            if (string.IsNullOrWhiteSpace(meeting.ProjectPlan))
+                return BadRequest("No project plan found. Please generate a project plan first.");
+
+            // Prevent regeneration if backlog already exists
+            if (!string.IsNullOrWhiteSpace(meeting.Backlog))
+            {
+                return BadRequest("Product backlog already exists. You cannot generate it again.");
+            }
+
+            var apiKey = _configuration["OpenAI:ApiKey"];
+            if (string.IsNullOrWhiteSpace(apiKey))
+                return StatusCode(500, "OpenAI API key not configured.");
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient("OpenAI");
+
+                var backlog = await BacklogService.GenerateBacklogFromProjectPlan(
+                    client,
+                    meeting.ProjectPlan,
+                    apiKey
+                );
+
+                meeting.Backlog = backlog;
+                meeting.BacklogGeneratedAt = DateTime.UtcNow;
+
+                await _db.SaveChangesAsync();
+
+                return Ok(new BacklogResponse
+                {
+                    MeetingId = id,
+                    Backlog = backlog,
+                    GeneratedAt = meeting.BacklogGeneratedAt.Value
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Generate backlog failed: {ex}");
+                return StatusCode(500, "Failed to generate product backlog.");
+            }
+        }
+
+        // Endpoint to get the backlog for a meeting
+        [HttpGet("{id}/backlog")]
+        public async Task<IActionResult> GetBacklog(int id)
+        {
+            var meeting = await _db.Meetings.FindAsync(id);
+            if (meeting == null) return NotFound();
+
+            if (string.IsNullOrWhiteSpace(meeting.Backlog))
+                return NotFound("No product backlog found for this meeting.");
+
+            return Ok(new BacklogResponse
+            {
+                MeetingId = id,
+                MeetingTitle = meeting.Title,
+                FirefliesId = meeting.FirefliesId,
+                Backlog = meeting.Backlog,
+                GeneratedAt = meeting.BacklogGeneratedAt ?? DateTime.MinValue
+            });
+        }
+
+        // Endpoint to update the backlog for a meeting
+        [HttpPut("{id}/backlog")]
+        public async Task<IActionResult> UpdateBacklog(int id, [FromBody] UpdateBacklogDto dto)
+        {
+            var meeting = await _db.Meetings.FindAsync(id);
+            if (meeting == null) return NotFound();
+
+            meeting.Backlog = dto.Backlog ?? meeting.Backlog;
+            await _db.SaveChangesAsync();
+
+            return Ok(new { message = "Product backlog updated." });
+        }
+
+        // Endpoint to download backlog as a markdown file
+        [HttpGet("{id}/download-backlog")]
+        public async Task<IActionResult> DownloadBacklog(int id)
+        {
+            var meeting = await _db.Meetings.FindAsync(id);
+            if (meeting == null || string.IsNullOrWhiteSpace(meeting.Backlog))
+                return NotFound("Product backlog not found");
+
+            var bytes = Encoding.UTF8.GetBytes(meeting.Backlog);
+            var fileName = $"{meeting.Title?.Replace(" ", "_") ?? "product"}_backlog.md";
+
+            return File(bytes, "text/markdown", fileName);
+        }
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Generate backlog failed: {ex}");
-        return StatusCode(500, "Failed to generate product backlog.");
-    }
-}
 
-// Endpoint to get the backlog for a meeting
-[HttpGet("{id}/backlog")]
-public async Task<IActionResult> GetBacklog(int id)
-{
-    var meeting = await _db.Meetings.FindAsync(id);
-    if (meeting == null) return NotFound();
-
-    if (string.IsNullOrWhiteSpace(meeting.Backlog))
-        return NotFound("No product backlog found for this meeting.");
-
-    return Ok(new BacklogResponse
-    {
-        MeetingId = id,
-        MeetingTitle = meeting.Title,
-        FirefliesId = meeting.FirefliesId,
-        Backlog = meeting.Backlog,
-        GeneratedAt = meeting.BacklogGeneratedAt ?? DateTime.MinValue
-    });
-}
-
-// Endpoint to update the backlog for a meeting
-[HttpPut("{id}/backlog")]
-public async Task<IActionResult> UpdateBacklog(int id, [FromBody] UpdateBacklogDto dto)
-{
-    var meeting = await _db.Meetings.FindAsync(id);
-    if (meeting == null) return NotFound();
-
-    meeting.Backlog = dto.Backlog ?? meeting.Backlog;
-    await _db.SaveChangesAsync();
-
-    return Ok(new { message = "Product backlog updated." });
-}
-
-// Endpoint to download backlog as a markdown file
-[HttpGet("{id}/download-backlog")]
-public async Task<IActionResult> DownloadBacklog(int id)
-{
-    var meeting = await _db.Meetings.FindAsync(id);
-    if (meeting == null || string.IsNullOrWhiteSpace(meeting.Backlog))
-        return NotFound("Product backlog not found");
-
-    var bytes = Encoding.UTF8.GetBytes(meeting.Backlog);
-    var fileName = $"{meeting.Title?.Replace(" ", "_") ?? "product"}_backlog.md";
-
-    return File(bytes, "text/markdown", fileName);
-}
-
-    }
-
-
-    
-    
     public record SaveMeetingDto(
         string FirefliesId,
         string Title,
@@ -522,20 +507,23 @@ public async Task<IActionResult> DownloadBacklog(int id)
         string? Keywords,
         string? ExtendedSectionsJson,
         string? AudioUrl
+        // Note: OrganizerEmail is not included in DTO as it comes from Fireflies API only
     );
+    
     public record BacklogResponse
-{
-    public int MeetingId { get; set; }
-    public string? MeetingTitle { get; set; }
-    public string? FirefliesId { get; set; }
-    public string Backlog { get; set; } = string.Empty;
-    public DateTime GeneratedAt { get; set; }
-}
+    {
+        public int MeetingId { get; set; }
+        public string? MeetingTitle { get; set; }
+        public string? FirefliesId { get; set; }
+        public string Backlog { get; set; } = string.Empty;
+        public DateTime GeneratedAt { get; set; }
+    }
+    
     // DTO for updating summary
     public record UpdateSummaryDto(string Summary);
     // DTO for updating preferences
-   public record UpdatePreferencesDto(JsonElement Preferences);
-   // DTO for updating project plan
+    public record UpdatePreferencesDto(JsonElement Preferences);
+    // DTO for updating project plan
     public record UpdateProjectPlanDto(string ProjectPlan);
     
     public record UpdateBacklogDto(string Backlog);

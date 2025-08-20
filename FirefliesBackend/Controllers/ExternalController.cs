@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using FirefliesBackend.Services;
@@ -30,12 +29,12 @@ namespace FirefliesBackend.Controllers
             _configuration = configuration;
         }
 
-           // Endpoint to get a list of meetings from Fireflies
+        // Endpoint to get a list of meetings from Fireflies
         // This will return the latest meetings with their details like id, title, date, duration
         // It will also return the summary of each meeting
         // The limit parameter can be used to limit the number of meetings returned
         // Default limit is 25 meetings
-           [HttpGet("meetings")]
+        [HttpGet("meetings")]
         public async Task<IActionResult> GetMeetings(int limit = 25)
         {
             var query = @"query Transcripts($limit:Int){
@@ -47,7 +46,6 @@ namespace FirefliesBackend.Controllers
             var doc = await _ff.QueryAsync(query, new { limit });
             return Ok(doc.RootElement.GetProperty("data").GetProperty("transcripts"));
         }
-
 
         // Endpoint to get a meeting by its id
         [HttpGet("meetings/{id}")]
@@ -65,107 +63,114 @@ namespace FirefliesBackend.Controllers
                     sentences = dbMeeting.TranscriptJson,
                     summary = new
                     {
-                         overview = dbMeeting.Summary,
-                short_summary = dbMeeting.Summary,
-                bullet_gist = dbMeeting.BulletGist,
-                action_items = dbMeeting.ActionItems,
-                keywords = dbMeeting.Keywords,
-                extended_sections = dbMeeting.ExtendedSectionsJson
+                        overview = dbMeeting.Summary,
+                        short_summary = dbMeeting.Summary,
+                        bullet_gist = dbMeeting.BulletGist,
+                        action_items = dbMeeting.ActionItems,
+                        keywords = dbMeeting.Keywords,
+                        extended_sections = dbMeeting.ExtendedSectionsJson
                     },
-                      audio_url = dbMeeting.AudioUrl,
-            summaryPreferencesJson = dbMeeting.SummaryPreferencesJson,
-            userEditedSummary = dbMeeting.UserEditedSummary
+                    audio_url = dbMeeting.AudioUrl,
+                    summaryPreferencesJson = dbMeeting.SummaryPreferencesJson,
+                    userEditedSummary = dbMeeting.UserEditedSummary
+                    // Note: OrganizerEmail is intentionally not included in response as per requirement
                 };
                 return Ok(mapped);
             }
 
-               try
-    {
-        var query = @"query Transcript($id:String!){
-            transcript(id:$id){
-            id title date duration audio_url
-            sentences { index text start_time end_time speaker_name }
-            summary { 
-                overview short_summary bullet_gist action_items keywords
-                extended_sections { title content }
-            }
-            }
-        }";
-
-        var doc = await _ff.QueryAsync(query, new { id });
-        var transcriptEl = doc.RootElement.GetProperty("data").GetProperty("transcript");
-
-        //Parse Meeting Date into dateTime
-        DateTime? meetingDate = null;
-        if (transcriptEl.TryGetProperty("date", out var dateEl))
-        {
-            if (dateEl.ValueKind == JsonValueKind.Number && dateEl.TryGetInt64(out var unixTimestamp))
+            try
             {
-                meetingDate = DateTimeOffset.FromUnixTimeMilliseconds(unixTimestamp).UtcDateTime;
+                var query = @"query Transcript($id:String!){
+                    transcript(id:$id){
+                    id title date duration audio_url organizer_email
+                    sentences { index text start_time end_time speaker_name }
+                    summary { 
+                        overview short_summary bullet_gist action_items keywords
+                        extended_sections { title content }
+                    }
+                    }
+                }";
+
+                var doc = await _ff.QueryAsync(query, new { id });
+                var transcriptEl = doc.RootElement.GetProperty("data").GetProperty("transcript");
+
+                //Parse Meeting Date into dateTime
+                DateTime? meetingDate = null;
+                if (transcriptEl.TryGetProperty("date", out var dateEl))
+                {
+                    if (dateEl.ValueKind == JsonValueKind.Number && dateEl.TryGetInt64(out var unixTimestamp))
+                    {
+                        meetingDate = DateTimeOffset.FromUnixTimeMilliseconds(unixTimestamp).UtcDateTime;
+                    }
+                    else if (dateEl.ValueKind == JsonValueKind.String && dateEl.TryGetDateTimeOffset(out var dto))
+                    {
+                        meetingDate = dto.UtcDateTime;
+                    }
+                }
+
+                // Extract organizer email
+                string? organizerEmail = null;
+                if (transcriptEl.TryGetProperty("organizer_email", out var emailEl) && emailEl.ValueKind != JsonValueKind.Null)
+                {
+                    organizerEmail = emailEl.GetString();
+                }
+
+                var meeting = new Meeting
+                {
+                    FirefliesId = transcriptEl.GetProperty("id").GetString() ?? id,
+                    Title = transcriptEl.GetProperty("title").GetString() ?? "",
+                    MeetingDate = meetingDate,
+                    OrganizerEmail = organizerEmail
+                };
+
+                string? bulletGist = null;
+                string? actionItems = null;
+                string? keywords = null;
+                string? extendedSectionsJson = null;
+                if (transcriptEl.TryGetProperty("summary", out var summaryEl) && summaryEl.ValueKind != JsonValueKind.Null)
+                {
+                    if (summaryEl.TryGetProperty("bullet_gist", out var bgEl) && bgEl.ValueKind != JsonValueKind.Null) bulletGist = bgEl.GetString();
+                    if (summaryEl.TryGetProperty("action_items", out var aiEl) && aiEl.ValueKind != JsonValueKind.Null) actionItems = aiEl.ToString();
+                    if (summaryEl.TryGetProperty("keywords", out var kwEl) && kwEl.ValueKind != JsonValueKind.Null) keywords = kwEl.ToString();
+                    if (summaryEl.TryGetProperty("extended_sections", out var extEl) && extEl.ValueKind == JsonValueKind.Array) extendedSectionsJson = extEl.ToString();
+                }
+                meeting.DurationSeconds = transcriptEl.TryGetProperty("duration", out var dur) && dur.TryGetDouble(out var duration) ? (int)Math.Round(duration) : 0;
+                meeting.TranscriptJson = transcriptEl.TryGetProperty("sentences", out var s) ? s.ToString() : "[]";
+                meeting.Summary = transcriptEl.TryGetProperty("summary", out var su) && su.TryGetProperty("overview", out var ov) ? ov.GetString() ?? "" : "";
+                meeting.ActionItems = actionItems;
+                meeting.Keywords = keywords;
+                meeting.BulletGist = bulletGist;
+                meeting.ExtendedSectionsJson = extendedSectionsJson;
+                meeting.AudioUrl = transcriptEl.TryGetProperty("audio_url", out var audioUrlEl) ? audioUrlEl.GetString() : null;
+
+                Console.WriteLine($"[LOG 1 - ExternalController SAVE]: Fireflies se aayi date (UTC): {meeting.MeetingDate}, Kind: {meeting.MeetingDate?.Kind}");
+                Console.WriteLine($"[LOG 2 - ExternalController SAVE]: Organizer Email: {meeting.OrganizerEmail}");
+
+                _db.Meetings.Add(meeting);
+                // Save the meeting to the database
+                await _db.SaveChangesAsync();
+
+                var responseData = new {
+                    transcript = transcriptEl,
+                    dbId = meeting.Id
+                };
+
+                return Ok(JsonSerializer.SerializeToElement(responseData));
             }
-            else if (dateEl.ValueKind == JsonValueKind.String && dateEl.TryGetDateTimeOffset(out var dto))
+            catch (HttpRequestException httpEx)
             {
-                meetingDate = dto.UtcDateTime;
+                //503 = Fireflies service/network issue.
+                Console.WriteLine($"[ERROR - ExternalController] Network error fetching from Fireflies: {httpEx.Message}");
+                return StatusCode(503, new { message = "The Fireflies service is temporarily unavailable. Please try again later.", error = "NetworkError" });
+            }
+            catch (Exception ex)
+            {
+                //500 = Unexpected error in parsing/DB.
+                Console.WriteLine("Failed processing Fireflies data: " + ex);
+                return StatusCode(500, new { message = "An unexpected error occurred while processing data from Fireflies.", error = ex.GetType().Name });
             }
         }
 
-        var meeting = new Meeting
-        {
-            FirefliesId = transcriptEl.GetProperty("id").GetString() ?? id,
-            Title = transcriptEl.GetProperty("title").GetString() ?? "",
-            MeetingDate = meetingDate,
-        };
-
-
-        string? bulletGist = null;
-        string? actionItems = null;
-        string? keywords = null;
-        string? extendedSectionsJson = null;
-        if (transcriptEl.TryGetProperty("summary", out var summaryEl) && summaryEl.ValueKind != JsonValueKind.Null)
-        {
-            if (summaryEl.TryGetProperty("bullet_gist", out var bgEl) && bgEl.ValueKind != JsonValueKind.Null) bulletGist = bgEl.GetString();
-            if (summaryEl.TryGetProperty("action_items", out var aiEl) && aiEl.ValueKind != JsonValueKind.Null) actionItems = aiEl.ToString();
-            if (summaryEl.TryGetProperty("keywords", out var kwEl) && kwEl.ValueKind != JsonValueKind.Null) keywords = kwEl.ToString();
-            if (summaryEl.TryGetProperty("extended_sections", out var extEl) && extEl.ValueKind == JsonValueKind.Array) extendedSectionsJson = extEl.ToString();
-        }
-        meeting.DurationSeconds = transcriptEl.TryGetProperty("duration", out var dur) && dur.TryGetDouble(out var duration) ? (int)Math.Round(duration) : 0;
-        meeting.TranscriptJson = transcriptEl.TryGetProperty("sentences", out var s) ? s.ToString() : "[]";
-        meeting.Summary = transcriptEl.TryGetProperty("summary", out var su) && su.TryGetProperty("overview", out var ov) ? ov.GetString() ?? "" : "";
-        meeting.ActionItems = actionItems;
-        meeting.Keywords = keywords;
-        meeting.BulletGist = bulletGist;
-        meeting.ExtendedSectionsJson = extendedSectionsJson;
-        meeting.AudioUrl = transcriptEl.TryGetProperty("audio_url", out var audioUrlEl) ? audioUrlEl.GetString() : null;
-
-        Console.WriteLine($"[LOG 1 - ExternalController SAVE]: Fireflies se aayi date (UTC): {meeting.MeetingDate}, Kind: {meeting.MeetingDate?.Kind}");
-
-
-        _db.Meetings.Add(meeting);
-        // Save the meeting to the database
-        await _db.SaveChangesAsync();
-
-        var responseData = new {
-            transcript = transcriptEl,
-            dbId = meeting.Id
-        };
-
-        return Ok(JsonSerializer.SerializeToElement(responseData));
-    }
-    catch (HttpRequestException httpEx)
-    {
-
-        //503 = Fireflies service/network issue.
-        Console.WriteLine($"[ERROR - ExternalController] Network error fetching from Fireflies: {httpEx.Message}");
-        return StatusCode(503, new { message = "The Fireflies service is temporarily unavailable. Please try again later.", error = "NetworkError" });
-    }
-    catch (Exception ex)
-    {
-
-        //500 = Unexpected error in parsing/DB.
-        Console.WriteLine("Failed processing Fireflies data: " + ex);
-        return StatusCode(500, new { message = "An unexpected error occurred while processing data from Fireflies.", error = ex.GetType().Name });
-    }
-}
         // Endpoint to generate files from a meeting summary
         // This will call the OpenAI API to generate files based on the meeting summary
         // It will return the generated files as a list of FileResult objects
@@ -211,5 +216,3 @@ namespace FirefliesBackend.Controllers
         }
     }
 }
-
-

@@ -35,5 +35,7 @@ namespace FirefliesBackend.Models
 
         public string Backlog { get; set; } = string.Empty;
         public DateTime? BacklogGeneratedAt { get; set; }
+        
+        public string? OrganizerEmail { get; set; }
     }
 }

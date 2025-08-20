@@ -371,7 +371,15 @@ export default function Backlog() {
 
           {/* Enhanced toolbar */}
           <div ref={toolbarRef} className="flex items-center gap-3 translate-y-6 opacity-0 transition-all duration-500">
-            <IconCircle title="Back" onClick={handleBack} accent="from-gray-50 to-white" accentHover="from-gray-100 to-white" icon={<ArrowLeftFromLine className="w-4 h-4 text-gray-700" />} />
+            <IconCircle 
+  title="Back" 
+  onClick={handleBack} 
+  accent="from-gray-50 to-white" 
+  accentHover="from-gray-100 to-white" 
+  animateFloat
+  icon={<ArrowLeftFromLine className="w-4 h-4 text-gray-700" />} 
+  animateOnClick="animate-bounce-left"
+/>
             
             <IconCircle 
               title={viewMode === "table" ? "Markdown View" : "Table View"} 
@@ -393,13 +401,15 @@ export default function Backlog() {
             
             <div className="relative">
               <IconCircle 
-                title="Save" 
-                onClick={handleSave} 
-                disabled={!isEditing || saving} 
-                accent="from-emerald-50 to-green-50" 
-                accentHover="from-emerald-200 to-green-200" 
-                icon={saving ? <Loader2 className="w-4 h-4 animate-spin text-green-600" /> : <Save className="w-4 h-4 text-green-600" />} 
-              />
+  title="Save" 
+  onClick={handleSave} 
+  disabled={!isEditing || saving} 
+  accent="from-emerald-50 to-green-50" 
+  accentHover="from-emerald-200 to-green-200" 
+  animateFloat
+  icon={saving ? <Loader2 className="w-4 h-4 animate-spin text-green-600" /> : <Save className="w-4 h-4 text-green-600" />} 
+  animateOnClick="animate-pulse-save"
+/>
               {saveSuccess && (
                 <span className="absolute -top-2 -right-2 bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-lg animate-pop">
                   <Check className="w-3.5 h-3.5" />
@@ -408,12 +418,14 @@ export default function Backlog() {
             </div>
             
             <IconCircle 
-              title="Download (.md)" 
-              onClick={handleDownload} 
-              accent="from-purple-50 to-purple-100" 
-              accentHover="from-purple-300 to-purple-400" 
-              icon={<Download className="w-4 h-4 text-purple-700" />} 
-            />
+  title="Download (.md)" 
+  onClick={handleDownload} 
+  accent="from-purple-50 to-purple-100" 
+  accentHover="from-purple-300 to-purple-400" 
+  animateFloat
+  icon={<Download className="w-4 h-4 text-purple-700" />} 
+  animateOnClick="animate-spin-download"
+/>
           </div>
         </div>
 
@@ -593,6 +605,23 @@ export default function Backlog() {
 
       {/* Animations & helpers */}
       <style>{`
+      @keyframes bounceLeft {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-6px); }
+}
+@keyframes pulseSave {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
+@keyframes spinDownload {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(360deg) scale(0.9); }
+  100% { transform: rotate(720deg) scale(1); }
+}
+
+.animate-bounce-left { animation: bounceLeft 0.5s ease; }
+.animate-pulse-save { animation: pulseSave 0.6s ease; }
+.animate-spin-download { animation: spinDownload 0.6s ease; }
         @keyframes floaty {
           0% { transform: translateY(0); }
           50% { transform: translateY(-6px); }
@@ -674,23 +703,54 @@ function IconCircle({
   disabled = false, 
   accent = "from-white to-white", 
   accentHover = "from-white to-white", 
-  animateFloat = false 
+  animateFloat = false,
+  animateOnClick = ""   // <--- NEW
 }) {
+  const [clicked, setClicked] = useState(false);
   const content = icon || children;
+
+  function handleClick(e) {
+    if (disabled) return;
+    if (onClick) onClick(e);
+
+    if (animateOnClick) {
+      setClicked(true);
+      setTimeout(() => setClicked(false), 600); // reset animation
+    }
+  }
+
   return (
     <button
       title={title}
       aria-label={title}
-      onClick={disabled ? undefined : onClick}
+      onClick={handleClick}
       disabled={disabled}
-      className={`relative w-11 h-11 rounded-full flex items-center justify-center transition transform active:scale-95 shadow-sm ${className} bg-gradient-to-br ${accent} hover:from-purple-400 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-200 ${disabled ? "opacity-50 cursor-not-allowed" : "hover:scale-105"}`}
+      className={`
+        relative w-11 h-11 rounded-full flex items-center justify-center
+        bg-gradient-to-br ${accent}
+        shadow-sm transition-all duration-300 ease-out
+        active:scale-95
+        ${className}
+        ${disabled 
+          ? "opacity-50 cursor-not-allowed" 
+          : "hover:scale-110 hover:rotate-6 hover:shadow-xl hover:from-purple-400 hover:to-indigo-500"
+        }
+        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-200
+        ${clicked ? animateOnClick : ""}
+      `}
     >
-      <span className={`flex items-center justify-center ${animateFloat ? "animate-float" : ""}`}>
+      <span
+        className={`
+          flex items-center justify-center transform transition-transform duration-300
+          ${animateFloat ? "animate-float" : ""}
+        `}
+      >
         {content}
       </span>
     </button>
   );
 }
+
 
 function AlertIcon() {
   return (
