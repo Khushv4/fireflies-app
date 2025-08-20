@@ -32,5 +32,8 @@ namespace FirefliesBackend.Models
          public string? SummaryPreferencesJson { get; set; }
          public string? UserEditedSummary { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public string Backlog { get; set; } = string.Empty;
+        public DateTime? BacklogGeneratedAt { get; set; }
     }
 }

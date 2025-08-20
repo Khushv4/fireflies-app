@@ -5,6 +5,7 @@ import MeetingDetail from "./MeetingDetail";
 import SavedMeetings from "./SavedMeetings";
 import GenerateFiles from "./GenerateFiles";
 import ProjectPlan from "./ProjectPlan";
+import Backlog from "./Backlog";
 export default function App() {
   return (
     <BrowserRouter>
@@ -35,9 +36,8 @@ export default function App() {
             <Route path="/meetings/:id" element={<MeetingDetail />} />
             <Route path="/saved" element={<SavedMeetings />} />
             <Route path="/generate-files/:dbId" element={<GenerateFiles />} />
-            <Route path="/project-plan/:dbId" element={<ProjectPlan />
-              }
-            />
+            <Route path="/project-plan/:dbId" element={<ProjectPlan />}/>
+            <Route path="/meeting/:dbId/backlog" element={<Backlog />} />
            
           </Routes>
         </main>

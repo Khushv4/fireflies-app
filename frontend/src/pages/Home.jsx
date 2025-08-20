@@ -59,26 +59,32 @@ export default function Home() {
 
   // ✅ Navigation logic when user clicks a meeting
   const handleMeetingClick = async (id) => {
-    try {
-      const res = await fetch(`${API}/api/meetings/${id}`);
-      if (!res.ok) return;
-      const meeting = await res.json();
+  try {
+    const res = await fetch(`${API}/api/meetings/${id}`);
+    if (!res.ok) return;
+    const meeting = await res.json();
 
-      if (meeting.projectPlan || meeting.hasProjectPlan) {
-        navigate(`/project-plan/${id}`);
-      } else if (
-        meeting.functionalDoc?.length > 0 ||
-        meeting.mockups?.length > 0 ||
-        meeting.markdown?.length > 0
-      ) {
-        navigate(`/generate-files/${id}`);
+    if (meeting.projectPlan || meeting.hasProjectPlan) {
+      navigate(`/project-plan/${meeting.id}`);   // DB ID
+    } else if (
+      meeting.functionalDoc?.length > 0 ||
+      meeting.mockups?.length > 0 ||
+      meeting.markdown?.length > 0
+    ) {
+      navigate(`/generate-files/${meeting.id}`); // DB ID
+    } else {
+      // use external FirefliesId if present
+      if (meeting.firefliesId) {
+        navigate(`/meetings/${meeting.firefliesId}`);
       } else {
-        navigate(`/meetings/${id}`);
+        console.warn("No FirefliesId found, falling back to DB id");
+        navigate(`/meetings/${meeting.id}`);
       }
-    } catch (err) {
-      console.error("Failed to navigate:", err);
     }
-  };
+  } catch (err) {
+    console.error("Failed to navigate:", err);
+  }
+};
 
   return (
     <div

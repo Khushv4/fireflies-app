@@ -12,9 +12,9 @@ import {
   FileText,
   Check,
   X,
+  ListTodo,
+  Sparkles,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 const API = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -29,6 +29,10 @@ export default function ProjectPlan() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // New states for backlog generation
+  const [generatingBacklog, setGeneratingBacklog] = useState(false);
+  const [backlogGenerated, setBacklogGenerated] = useState(false);
 
   const contentRef = useRef(null);
   const toolbarRef = useRef(null);
@@ -69,10 +73,24 @@ export default function ProjectPlan() {
       const data = await res.json();
       setPlanData(data);
       setEditedContent(cleanMarkdown(data.projectPlan ?? ""));
+      
+      // Check if backlog already exists
+      await checkBacklogExists(id);
     } catch (err) {
       setError(err.message || "Failed to load project plan");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Check if backlog already exists for this meeting
+  async function checkBacklogExists(id) {
+    try {
+      const res = await fetch(`${API}/api/meetings/${id}/backlog`);
+      setBacklogGenerated(res.ok);
+    } catch (err) {
+      // Ignore errors - backlog doesn't exist
+      setBacklogGenerated(false);
     }
   }
 
@@ -108,6 +126,46 @@ export default function ProjectPlan() {
     }
   }
 
+  // New function to generate backlog
+  async function handleGenerateBacklog() {
+    if (!dbId) return;
+    setGeneratingBacklog(true);
+    setError(null);
+    
+    try {
+      const res = await fetch(`${API}/api/meetings/${dbId}/generate-backlog`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+      
+      const data = await res.json();
+      setBacklogGenerated(true);
+      
+      // Show success message
+      setError(null);
+      
+      // Optionally navigate to backlog view after generation
+      setTimeout(() => {
+        navigate(`/meeting/${dbId}/backlog`);
+      }, 1000);
+      
+    } catch (err) {
+      setError(err.message || "Failed to generate product backlog");
+    } finally {
+      setGeneratingBacklog(false);
+    }
+  }
+
+  // Navigate to backlog view
+  function handleViewBacklog() {
+    navigate(`/meeting/${dbId}/backlog`);
+  }
+
   function handleDownload() {
     const content = editedContent || planData?.projectPlan || "";
     if (!content) return;
@@ -127,46 +185,19 @@ export default function ProjectPlan() {
     navigate(-1);
   }
 
-  // improved markdown renderers
-  const mdComponents = {
-    h1: ({ node, ...props }) => (
-      <h1 className="text-3xl md:text-4xl font-extrabold mt-8 mb-4 pb-3 border-b border-gray-100 text-gray-900" {...props} />
-    ),
-    h2: ({ node, ...props }) => (
-      <h2 className="text-2xl md:text-3xl font-bold mt-6 mb-3 text-gray-800" {...props} />
-    ),
-    h3: ({ node, ...props }) => (
-      <h3 className="text-xl md:text-2xl font-semibold mt-5 mb-2 text-gray-700" {...props} />
-    ),
-    p: ({ node, ...props }) => <p className="leading-relaxed mb-3 text-gray-700" {...props} />,
-    li: ({ node, ordered, ...props }) => (
-      <li className={`mb-2 ${ordered ? "list-decimal ml-6" : "ml-6 list-disc"}`} {...props} />
-    ),
-    table: ({ node, ...props }) => (
-      <div className="overflow-x-auto my-4">
-        <table className="min-w-full border-collapse text-sm" {...props} />
-      </div>
-    ),
-    th: ({ node, ...props }) => (
-      <th className="border-b-2 border-gray-200 text-left px-3 py-2 bg-gradient-to-r from-indigo-50 to-blue-50 font-semibold" {...props} />
-    ),
-    td: ({ node, ...props }) => (
-      <td className="border-b border-gray-100 px-3 py-2 align-top" {...props} />
-    ),
-    code: ({ inline, className, children, ...props }) => {
-      if (inline) {
-        return <code className="bg-indigo-50 px-1 py-0.5 rounded text-sm font-mono text-indigo-700" {...props}>{children}</code>;
-      }
-      return (
-        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-xs">
-          <code className={className} {...props}>{children}</code>
-        </pre>
-      );
-    },
-    blockquote: ({ node, ...props }) => (
-      <blockquote className="border-l-4 border-indigo-200 pl-4 italic text-gray-600 my-4" {...props} />
-    ),
-  };
+  // Simple markdown renderer for display
+  function renderMarkdown(content) {
+    if (!content) return "";
+    
+    // Basic markdown-like rendering
+    return content
+      .replace(/^### (.*$)/gim, '<h3 class="text-xl md:text-2xl font-semibold mt-5 mb-2 text-gray-700">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 class="text-2xl md:text-3xl font-bold mt-6 mb-3 text-gray-800">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 class="text-3xl md:text-4xl font-extrabold mt-8 mb-4 pb-3 border-b border-gray-100 text-gray-900">$1</h1>')
+      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+      .replace(/\*(.*)\*/gim, '<em>$1</em>')
+      .replace(/\n/gim, '<br />');
+  }
 
   // loading
   if (loading) {
@@ -280,6 +311,68 @@ export default function ProjectPlan() {
           </div>
         </div>
 
+        {/* Backlog Generation Section */}
+        <div className="mb-6 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 rounded-2xl p-6 border border-purple-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="rounded-xl p-2 bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg">
+                <ListTodo className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Product Backlog</h3>
+                <p className="text-sm text-gray-600">
+                  {backlogGenerated 
+                    ? "Sprint-ready backlog generated! View user stories and acceptance criteria."
+                    : "Generate a detailed product backlog with user stories, acceptance criteria, and story points."
+                  }
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {backlogGenerated ? (
+                <button
+                  onClick={handleViewBacklog}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:from-purple-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-200"
+                >
+                  <ListTodo className="w-4 h-4" />
+                  View Backlog
+                </button>
+              ) : (
+                <button
+                  onClick={handleGenerateBacklog}
+                  disabled={generatingBacklog}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:from-purple-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {generatingBacklog ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generate Backlog
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {generatingBacklog && (
+            <div className="mt-4 bg-white/60 rounded-lg p-4 border">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Creating your product backlog...</p>
+                  <p className="text-xs text-gray-600">This may take 30-60 seconds. Please wait.</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* content card */}
         <div className="bg-white rounded-2xl shadow-xl border overflow-hidden">
           <div className="p-6 border-b">
@@ -300,9 +393,10 @@ export default function ProjectPlan() {
               </div>
             ) : (
               <div className="p-6 prose prose-lg max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                  {editedContent}
-                </ReactMarkdown>
+                <div 
+                  className="leading-relaxed text-gray-700"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(editedContent) }}
+                />
               </div>
             )}
           </div>
