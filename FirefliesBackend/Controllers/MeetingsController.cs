@@ -178,7 +178,7 @@ namespace FirefliesBackend.Controllers
         // This will call the OpenAI API to generate files based on the meeting summary
         // It will return the generated files as a JSON array
         [HttpPost("{id}/generate-files")]
-        public async Task<IActionResult> GenerateFilesFromDbSummary(int id)
+        public async Task<IActionResult> GenerateFilesFromDbSummary(int id, [FromBody] GenerateFilesRequest request = null)
         {
             var meeting = await _db.Meetings.FindAsync(id);
             if (meeting == null || string.IsNullOrWhiteSpace(meeting.Summary))
@@ -204,11 +204,13 @@ namespace FirefliesBackend.Controllers
             if (string.IsNullOrWhiteSpace(apiKey))
                 return StatusCode(500, "OpenAI API key not configured.");
 
+            var temperature = request?.Temperature ?? 0.3; // Default temperature
+
             var client = _httpClientFactory.CreateClient("OpenAI");
             List<FileResultModel> files;
             try
             {
-                files = await ChatGptService.GenerateFilesFromSummary(client, meeting.Summary, apiKey);
+                files = await ChatGptService.GenerateFilesFromSummary(client, meeting.Summary, apiKey, temperature);
             }
             catch (Exception ex)
             {
@@ -311,6 +313,7 @@ namespace FirefliesBackend.Controllers
             try
             {
                 var client = _httpClientFactory.CreateClient("OpenAI");
+                var temperature = request.Temperature ?? 0.3; // Use temperature from request or default
 
                 var projectPlan = await ProjectPlanService.GenerateProjectPlan(
                     client,
@@ -319,7 +322,8 @@ namespace FirefliesBackend.Controllers
                     meeting.Markdown ?? "",
                     request.DurationWeeks,
                     request.AdditionalDetails ?? "",
-                    apiKey
+                    apiKey,
+                    temperature
                 );
 
                 meeting.ProjectPlan = projectPlan;
@@ -398,7 +402,7 @@ namespace FirefliesBackend.Controllers
 
         // Endpoint to generate a product backlog based on the project plan
         [HttpPost("{id}/generate-backlog")]
-        public async Task<IActionResult> GenerateBacklog(int id)
+        public async Task<IActionResult> GenerateBacklog(int id, [FromBody] GenerateBacklogRequest request = null)
         {
             var meeting = await _db.Meetings.FindAsync(id);
             if (meeting == null)
@@ -421,11 +425,13 @@ namespace FirefliesBackend.Controllers
             try
             {
                 var client = _httpClientFactory.CreateClient("OpenAI");
+                var temperature = request?.Temperature ?? 0.3; // Use temperature from request or default
 
                 var backlog = await BacklogService.GenerateBacklogFromProjectPlan(
                     client,
                     meeting.ProjectPlan,
-                    apiKey
+                    apiKey,
+                    temperature
                 );
 
                 meeting.Backlog = backlog;
@@ -527,4 +533,15 @@ namespace FirefliesBackend.Controllers
     public record UpdateProjectPlanDto(string ProjectPlan);
     
     public record UpdateBacklogDto(string Backlog);
+
+    // New DTOs with Temperature support
+    public record GenerateFilesRequest
+    {
+        public double? Temperature { get; set; }
+    }
+
+    public record GenerateBacklogRequest
+    {
+        public double? Temperature { get; set; }
+    }
 }

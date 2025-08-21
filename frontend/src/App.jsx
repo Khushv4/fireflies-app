@@ -6,6 +6,7 @@ import SavedMeetings from "./SavedMeetings";
 import GenerateFiles from "./GenerateFiles";
 import ProjectPlan from "./ProjectPlan";
 import Backlog from "./Backlog";
+import AstronautLoader from "./AstronautLoader";
 export default function App() {
   return (
     <BrowserRouter>
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/generate-files/:dbId" element={<GenerateFiles />} />
             <Route path="/project-plan/:dbId" element={<ProjectPlan />}/>
             <Route path="/meeting/:dbId/backlog" element={<Backlog />} />
+            <Route path="*" element={<AstronautLoader />} />
            
           </Routes>
         </main>

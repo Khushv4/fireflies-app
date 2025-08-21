@@ -25,10 +25,14 @@ namespace FirefliesBackend.Services
             string markdown, 
             int durationWeeks, 
             string additionalDetails, 
-            string apiKey)
+            string apiKey,
+            double temperature = 0.3) // NEW: Added temperature parameter with default value
         {
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new InvalidOperationException("OpenAI API key not provided.");
+
+            // Validate temperature range
+            temperature = Math.Max(0.1, Math.Min(1.0, temperature));
 
             // NEW: Use Smart Document Truncation instead of summarization
             var optimizedDocs = OptimizeDocumentsForProjectPlan(functionalDoc, mockups, markdown, additionalDetails);
@@ -72,7 +76,7 @@ Be specific, realistic, and ensure tasks build upon each other logically.
                     new { role = "user", content = prompt }
                 },
                 max_tokens = 4000,
-                temperature = 0.3
+                temperature = temperature // NEW: Use dynamic temperature
             };
 
             var requestJson = JsonSerializer.Serialize(body);
@@ -101,6 +105,19 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             {
                 throw new Exception($"Failed to parse OpenAI response: {ex.Message}");
             }
+        }
+
+        // NEW: Overload method for backward compatibility (without temperature)
+        public static async Task<string> GenerateProjectPlan(
+            HttpClient client, 
+            string functionalDoc, 
+            string mockups, 
+            string markdown, 
+            int durationWeeks, 
+            string additionalDetails, 
+            string apiKey)
+        {
+            return await GenerateProjectPlan(client, functionalDoc, mockups, markdown, durationWeeks, additionalDetails, apiKey, 0.3);
         }
 
         // NEW: Smart Document Truncation Implementation
@@ -306,11 +323,13 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             return result.ToString();
         }
 
-        // Keep the old summarization method as fallback (optional)
+        // Keep the old summarization method as fallback (optional) - UPDATED to support temperature
         [Obsolete("Use OptimizeDocumentsForProjectPlan instead for better cost efficiency")]
-        private static async Task<string> SummarizeDocuments(HttpClient client, string docs, string apiKey)
+        private static async Task<string> SummarizeDocuments(HttpClient client, string docs, string apiKey, double temperature = 0.2)
         {
-            // Original summarization logic - kept for backwards compatibility if needed
+            // Validate temperature range
+            temperature = Math.Max(0.1, Math.Min(1.0, temperature));
+
             var summarizePrompt = @"
 Summarize the following technical documents while preserving all key technical details, requirements, features, and implementation specifics. 
 Keep the summary comprehensive but concise:
@@ -326,7 +345,7 @@ Keep the summary comprehensive but concise:
                     new { role = "user", content = summarizePrompt }
                 },
                 max_tokens = 3000,
-                temperature = 0.2
+                temperature = temperature // NEW: Use dynamic temperature
             };
 
             var requestJson = JsonSerializer.Serialize(body);

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeftFromLine,
+  Thermometer,
   Save,
   Loader2,
   Download,
@@ -55,6 +56,7 @@ export default function GenerateFiles() {
   const [projectDuration, setProjectDuration] = useState(4);
   const [additionalDetails, setAdditionalDetails] = useState("");
   const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [temperature, setTemperature] = useState(0.3);
 
   const pageRef = useRef(null);
   const cardRefs = useRef([]);
@@ -134,6 +136,22 @@ export default function GenerateFiles() {
     }
     initializeFilesAndCheckPlan();
   }, [dbId, selectedFiles]);
+
+  function getTemperatureDescription(temp) {
+  if (temp <= 0.2) return "Very Conservative - Highly consistent, predictable output";
+  if (temp <= 0.4) return "Conservative - Balanced with slight creativity";
+  if (temp <= 0.6) return "Balanced - Good mix of consistency and creativity";
+  if (temp <= 0.8) return "Creative - More varied and innovative output";
+  return "Very Creative - Highly diverse and experimental output";
+}
+
+function getTemperatureColor(temp) {
+  if (temp <= 0.2) return "from-blue-500 to-cyan-500";
+  if (temp <= 0.4) return "from-green-500 to-blue-500";
+  if (temp <= 0.6) return "from-yellow-500 to-green-500";
+  if (temp <= 0.8) return "from-orange-500 to-yellow-500";
+  return "from-red-500 to-orange-500";
+}
 
   async function handleSave() {
     if (!dbId) return;
@@ -445,84 +463,172 @@ export default function GenerateFiles() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div
-            ref={modalRef}
-            className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-800">
-                Generate Project Plan
-              </h3>
-              <button
-                onClick={closeModal}
-                className="p-2 hover:bg-gray-100 rounded-lg transition"
-                disabled={generatingPlan}
-              >
-                <X size={20} />
-              </button>
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div
+      ref={modalRef}
+      className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl"
+    >
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-2xl font-bold text-gray-800">
+          Generate Project Plan
+        </h3>
+        <button
+          onClick={closeModal}
+          className="p-2 hover:bg-gray-100 rounded-lg transition"
+          disabled={generatingPlan}
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="space-y-6">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <Calendar className="inline w-4 h-4 mr-1" />
+            Project Duration (weeks)
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="52"
+            value={projectDuration}
+            onChange={(e) =>
+              setProjectDuration(parseInt(e.target.value) || 1)
+            }
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            disabled={generatingPlan}
+          />
+        </div>
+
+        {/* Temperature Control Section */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-semibold text-gray-700">
+              <Thermometer className="inline w-4 h-4 mr-1" />
+              AI Temperature
+            </label>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${getTemperatureColor(temperature)} text-white`}>
+                {temperature.toFixed(1)}
+              </span>
             </div>
+          </div>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  <Calendar className="inline w-4 h-4 mr-1" />
-                  Project Duration (weeks)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="52"
-                  value={projectDuration}
-                  onChange={(e) =>
-                    setProjectDuration(parseInt(e.target.value) || 1)
-                  }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                  disabled={generatingPlan}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Additional Details (optional)
-                </label>
-                <textarea
-                  rows={4}
-                  value={additionalDetails}
-                  onChange={(e) => setAdditionalDetails(e.target.value)}
-                  placeholder="Any specific requirements, constraints, or preferences..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
-                  disabled={generatingPlan}
-                />
-              </div>
+          <div className="relative mb-3">
+            <input
+              type="range"
+              min="0.1"
+              max="1.0"
+              step="0.1"
+              value={temperature}
+              onChange={(e) => setTemperature(parseFloat(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+              disabled={generatingPlan}
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>0.1</span>
+              <span>0.5</span>
+              <span>1.0</span>
             </div>
+          </div>
 
-            <div className="flex gap-3 mt-8">
-              <button
-                onClick={closeModal}
-                disabled={generatingPlan}
-                className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleGenerateProjectPlan}
-                disabled={generatingPlan || projectDuration <= 0}
-                className="flex-1 py-3 px-4 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-xl hover:scale-[1.02] transition font-medium flex items-center justify-center gap-2"
-              >
-                {generatingPlan ? (
-                  <>
-                    <Loader2 className="animate-spin w-4 h-4" />
-                    Generating...
-                  </>
-                ) : (
-                  "Generate"
-                )}
-              </button>
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-sm font-medium text-gray-800 mb-1">
+              {getTemperatureDescription(temperature)}
+            </p>
+            <p className="text-xs text-gray-600">
+              Lower values = more consistent results, Higher values = more creative variations
+            </p>
+          </div>
+
+          {/* Temperature Visual Guide */}
+          <div className="grid grid-cols-5 gap-1 mt-3">
+            <div className="text-center">
+              <div className="w-full h-1.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded mb-1"></div>
+              <span className="text-xs text-gray-600">Conservative</span>
+            </div>
+            <div className="text-center">
+              <div className="w-full h-1.5 bg-gradient-to-r from-green-500 to-blue-500 rounded mb-1"></div>
+              <span className="text-xs text-gray-600">Balanced</span>
+            </div>
+            <div className="text-center">
+              <div className="w-full h-1.5 bg-gradient-to-r from-yellow-500 to-green-500 rounded mb-1"></div>
+              <span className="text-xs text-gray-600">Moderate</span>
+            </div>
+            <div className="text-center">
+              <div className="w-full h-1.5 bg-gradient-to-r from-orange-500 to-yellow-500 rounded mb-1"></div>
+              <span className="text-xs text-gray-600">Creative</span>
+            </div>
+            <div className="text-center">
+              <div className="w-full h-1.5 bg-gradient-to-r from-red-500 to-orange-500 rounded mb-1"></div>
+              <span className="text-xs text-gray-600">Experimental</span>
             </div>
           </div>
         </div>
-      )}
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Additional Details (optional)
+          </label>
+          <textarea
+            rows={4}
+            value={additionalDetails}
+            onChange={(e) => setAdditionalDetails(e.target.value)}
+            placeholder="Any specific requirements, constraints, or preferences..."
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
+            disabled={generatingPlan}
+          />
+        </div>
+      </div>
+
+      <div className="flex gap-3 mt-8">
+        <button
+          onClick={closeModal}
+          disabled={generatingPlan}
+          className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleGenerateProjectPlan}
+          disabled={generatingPlan || projectDuration <= 0}
+          className="flex-1 py-3 px-4 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-xl hover:scale-[1.02] transition font-medium flex items-center justify-center gap-2"
+        >
+          {generatingPlan ? (
+            <>
+              <Loader2 className="animate-spin w-4 h-4" />
+              Generating...
+            </>
+          ) : (
+            "Generate"
+          )}
+        </button>
+      </div>
+    </div>
+
+    {/* Custom Slider Styles */}
+    <style jsx>{`
+      .slider::-webkit-slider-thumb {
+        appearance: none;
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, #6366f1, #8b5cf6);
+        cursor: pointer;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      }
+      .slider::-moz-range-thumb {
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, #6366f1, #8b5cf6);
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      }
+    `}</style>
+  </div>
+)}
     </div>
   );
 }
