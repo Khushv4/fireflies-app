@@ -47,7 +47,7 @@ const EngagingLoadingAnimation = ({ progress }) => {
     <div className="fixed inset-0 flex items-center justify-center bg-slate-900/95 backdrop-blur-md z-50">
       <div className="text-center max-w-md mx-4">
         {/* BookLoader Component */}
-        <div className="mb-8 ml-6">
+        <div className="mb-8 ml-13">
           <BookLoader text="Crafting Your Documents" />
         </div>
         
@@ -69,14 +69,16 @@ const EngagingLoadingAnimation = ({ progress }) => {
         </div>
         
         {/* Progress Bar */}
-        <div className="w-full bg-slate-700/50 rounded-full h-3 mb-2 overflow-hidden">
+        <div className="w-full bg-slate-700/50 rounded-full h-3 mb-2 overflow-hidden shadow-inner">
           <div 
             ref={progressRef}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out relative overflow-hidden"
+            className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out relative overflow-hidden shadow-lg"
             style={{ width: '0%' }}
           >
-            {/* Shimmer effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 animate-pulse"></div>
+            {/* Enhanced shimmer effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent transform -skew-x-12 animate-shimmer"></div>
+            {/* Pulsing glow effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400/50 via-purple-400/50 to-blue-500/50 rounded-full animate-pulse opacity-75"></div>
           </div>
         </div>
         
@@ -98,7 +100,7 @@ const FullScreenStatus = ({ loading, error, loadingText = "Generating documents.
     {loading && (
       <>
         <BookLoader text={loadingText} />
-        <div className="mt-8 ml-6">
+        <div className="mt-18 ml-3">
           <div className="flex items-center justify-center space-x-2 text-blue-300">
             <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
             <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -169,14 +171,21 @@ const ProjectPlanModal = ({ isOpen, onClose, onGenerate }) => {
 
   if (!isOpen) return null;
 
-  const getTempColor = (t) =>
-    t <= 0.2
-      ? "text-blue-400"
-      : t <= 0.5
-      ? "text-green-400"
-      : t <= 0.8
-      ? "text-yellow-400"
-      : "text-red-400";
+  function getTemperatureDescription(temp) {
+    if (temp <= 0.2) return "Very Conservative - Highly consistent, predictable output";
+    if (temp <= 0.4) return "Conservative - Balanced with slight creativity";
+    if (temp <= 0.6) return "Balanced - Good mix of consistency and creativity";
+    if (temp <= 0.8) return "Creative - More varied and innovative output";
+    return "Very Creative - Highly diverse and experimental output";
+  }
+
+  function getTemperatureColor(temp) {
+    if (temp <= 0.2) return "from-blue-500 to-cyan-500";
+    if (temp <= 0.4) return "from-green-500 to-blue-500";
+    if (temp <= 0.6) return "from-yellow-500 to-green-500";
+    if (temp <= 0.8) return "from-orange-500 to-yellow-500";
+    return "from-red-500 to-orange-500";
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
@@ -226,26 +235,78 @@ const ProjectPlanModal = ({ isOpen, onClose, onGenerate }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
-                AI Temperature{" "}
-                <span
-                  className={`font-bold ${getTempColor(temperature)}`}
-                >
-                  {temperature.toFixed(1)}
-                </span>
-              </label>
-              <input
-                type="range"
-                min="0.1"
-                max="1.0"
-                step="0.1"
-                value={temperature}
-                onChange={(e) =>
-                  setTemperature(parseFloat(e.target.value))
-                }
-                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
-                disabled={isGenerating}
-              />
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-semibold text-slate-300">
+                  <Thermometer className="inline w-4 h-4 mr-1" />
+                  AI Temperature
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${getTemperatureColor(temperature)} text-white`}>
+                    {temperature.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="relative mb-3">
+                <div className="relative">
+                  <div className="w-full h-3 bg-slate-700/50 rounded-full overflow-hidden shadow-inner">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 rounded-full transition-all duration-300 ease-out relative"
+                      style={{ width: `${((temperature - 0.1) / 0.9) * 100}%` }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1.0"
+                    step="0.1"
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                    className="absolute inset-0 w-full h-3 appearance-none cursor-pointer bg-transparent slider-thumb"
+                    disabled={isGenerating}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-slate-500 mt-2">
+                  <span>0.1</span>
+                  <span>0.5</span>
+                  <span>1.0</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-700/30 rounded-lg p-3">
+                <p className="text-sm font-medium text-slate-300 mb-1">
+                  {getTemperatureDescription(temperature)}
+                </p>
+                <p className="text-xs text-slate-400">
+                  Lower values = more consistent results, Higher values = more creative variations
+                </p>
+              </div>
+
+              {/* Temperature Visual Guide */}
+              <div className="grid grid-cols-5 gap-1 mt-3">
+                <div className="text-center">
+                  <div className="w-full h-1.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded mb-1"></div>
+                  <span className="text-xs text-slate-400">Conservative</span>
+                </div>
+                <div className="text-center">
+                  <div className="w-full h-1.5 bg-gradient-to-r from-green-500 to-blue-500 rounded mb-1"></div>
+                  <span className="text-xs text-slate-400">Balanced</span>
+                </div>
+                <div className="text-center">
+                  <div className="w-full h-1.5 bg-gradient-to-r from-yellow-500 to-green-500 rounded mb-1"></div>
+                  <span className="text-xs text-slate-400">Moderate</span>
+                </div>
+                <div className="text-center">
+                  <div className="w-full h-1.5 bg-gradient-to-r from-orange-500 to-yellow-500 rounded mb-1"></div>
+                  <span className="text-xs text-slate-400">Creative</span>
+                </div>
+                <div className="text-center">
+                  <div className="w-full h-1.5 bg-gradient-to-r from-red-500 to-orange-500 rounded mb-1"></div>
+                  <span className="text-xs text-slate-400">Experimental</span>
+                </div>
+              </div>
             </div>
 
             <div>
@@ -286,6 +347,17 @@ const ProjectPlanModal = ({ isOpen, onClose, onGenerate }) => {
         .slider::-webkit-slider-thumb {
           background: #fff;
           box-shadow: 0 0 5px #fff, 0 0 10px #fff;
+        }
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%) skewX(-12deg);
+          }
+          100% {
+            transform: translateX(200%) skewX(-12deg);
+          }
         }
       `}</style>
     </div>
