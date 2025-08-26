@@ -26,13 +26,10 @@ namespace FirefliesBackend.Services
             int durationWeeks, 
             string additionalDetails, 
             string apiKey,
-            double temperature = 0.3) // NEW: Added temperature parameter with default value
+            double temperature = 0.3)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new InvalidOperationException("OpenAI API key not provided.");
-
-            // Validate temperature range
-            temperature = Math.Max(0.1, Math.Min(1.0, temperature));
 
             // NEW: Use Smart Document Truncation instead of summarization
             var optimizedDocs = OptimizeDocumentsForProjectPlan(functionalDoc, mockups, markdown, additionalDetails);
@@ -65,6 +62,8 @@ DAILY SCHEDULE FORMAT:
 |------|-----|------|------------|-------|
 
 Be specific, realistic, and ensure tasks build upon each other logically.
+CREATIVITY INSTRUCTION:
+{GetCreativityInstruction(temperature)}
 ".Trim();
 
             var body = new
@@ -76,7 +75,7 @@ Be specific, realistic, and ensure tasks build upon each other logically.
                     new { role = "user", content = prompt }
                 },
                 max_tokens = 4000,
-                temperature = temperature // NEW: Use dynamic temperature
+                temperature = temperature
             };
 
             var requestJson = JsonSerializer.Serialize(body);
@@ -107,18 +106,17 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             }
         }
 
-        // NEW: Overload method for backward compatibility (without temperature)
-        public static async Task<string> GenerateProjectPlan(
-            HttpClient client, 
-            string functionalDoc, 
-            string mockups, 
-            string markdown, 
-            int durationWeeks, 
-            string additionalDetails, 
-            string apiKey)
-        {
-            return await GenerateProjectPlan(client, functionalDoc, mockups, markdown, durationWeeks, additionalDetails, apiKey, 0.3);
-        }
+        private static string GetCreativityInstruction(double temperature)
+{
+    return temperature switch
+    {
+        <= 0.2 => "Focus on proven, industry-standard practices and methodologies. Prioritize consistency and reliability in your recommendations.",
+        <= 0.4 => "Balance standard practices with slight adaptations based on the project specifics. Include practical, tested approaches.",
+        <= 0.6 => "Provide a good mix of standard practices and innovative approaches. Consider creative solutions while maintaining practicality.",
+        <= 0.8 => "Be more creative and innovative in your approach. Suggest modern methodologies and creative problem-solving strategies.",
+        _ => "Think outside the box and provide highly innovative, creative approaches. Consider cutting-edge methodologies and experimental practices."
+    };
+}
 
         // NEW: Smart Document Truncation Implementation
         private static string OptimizeDocumentsForProjectPlan(string functionalDoc, string mockups, string markdown, string additionalDetails)
@@ -323,13 +321,11 @@ Be specific, realistic, and ensure tasks build upon each other logically.
             return result.ToString();
         }
 
-        // Keep the old summarization method as fallback (optional) - UPDATED to support temperature
+        // Keep the old summarization method as fallback (optional)
         [Obsolete("Use OptimizeDocumentsForProjectPlan instead for better cost efficiency")]
-        private static async Task<string> SummarizeDocuments(HttpClient client, string docs, string apiKey, double temperature = 0.2)
+        private static async Task<string> SummarizeDocuments(HttpClient client, string docs, string apiKey)
         {
-            // Validate temperature range
-            temperature = Math.Max(0.1, Math.Min(1.0, temperature));
-
+            // Original summarization logic - kept for backwards compatibility if needed
             var summarizePrompt = @"
 Summarize the following technical documents while preserving all key technical details, requirements, features, and implementation specifics. 
 Keep the summary comprehensive but concise:
@@ -345,7 +341,7 @@ Keep the summary comprehensive but concise:
                     new { role = "user", content = summarizePrompt }
                 },
                 max_tokens = 3000,
-                temperature = temperature // NEW: Use dynamic temperature
+                temperature = 0.2
             };
 
             var requestJson = JsonSerializer.Serialize(body);

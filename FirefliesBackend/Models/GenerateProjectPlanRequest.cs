@@ -5,6 +5,7 @@ namespace FirefliesBackend.Models
     {
         public int DurationWeeks { get; set; }
         public string AdditionalDetails { get; set; } = string.Empty;
+        public double Temperature { get; set; } = 0.3;
     }
 
     // Response containing the generated project plan
@@ -15,5 +16,6 @@ namespace FirefliesBackend.Models
         public int DurationWeeks { get; set; }
         public string AdditionalDetails { get; set; } = string.Empty;
         public DateTime GeneratedAt { get; set; }
+        public double Temperature { get; set; } = 0.3;
     }
 }

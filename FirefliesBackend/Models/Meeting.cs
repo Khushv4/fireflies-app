@@ -24,6 +24,7 @@ namespace FirefliesBackend.Models
         public int? ProjectDurationWeeks { get; set; }
         public string ProjectDetails { get; set; } = string.Empty;
         public DateTime? ProjectPlanGeneratedAt { get; set; }
+        public double? ProjectPlanTemperature { get; set; }
          public string? BulletGist { get; set; }// can be null
         public string? ActionItems { get; set; }
         public string? Keywords { get; set; }
